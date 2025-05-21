@@ -95,7 +95,80 @@ const Utils = {
     // Update loading bar progress
     updateLoadingProgress: function(percentage) {
         const progressBar = document.querySelector('.progress-value');
-        progressBar.style.width = `${percentage}%`;
+        if (progressBar) {
+            progressBar.style.width = `${percentage}%`;
+        }
+    },
+    
+    // Create a skybox with blue sky - simplified version to avoid shader issues
+    createSkyBox: function(scene) {
+        try {
+            console.log("Creating simplified blue sky");
+            
+            // Use a simple color instead of a shader-based sky to avoid compatibility issues
+            scene.background = new THREE.Color(0x87CEEB); // Sky blue
+            
+            // Create a large sky dome with gradient
+            const skyGeometry = new THREE.SphereGeometry(500, 16, 16);
+            
+            // Create a simple gradient material instead of using shaders
+            const skyMaterial = new THREE.MeshBasicMaterial({
+                color: 0x87CEEB, // Sky blue
+                side: THREE.BackSide,
+                fog: false
+            });
+            
+            const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+            scene.add(sky);
+            
+            console.log("Sky created successfully");
+            return sky;
+        } catch (error) {
+            console.error("Error creating sky:", error);
+            // Return null instead of failing completely
+            return null;
+        }
+    },
+    
+    // Add simple clouds to the sky - simplified version
+    addClouds: function(scene) {
+        try {
+            console.log("Adding simplified clouds");
+            const cloudGroup = new THREE.Group();
+            
+            // Create a simpler cloud material
+            const cloudMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.7
+            });
+            
+            // Add just a few simple clouds
+            for (let i = 0; i < 10; i++) {
+                const cloudGeometry = new THREE.SphereGeometry(10, 8, 8);
+                const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+                
+                // Position clouds in the sky
+                cloud.position.set(
+                    Math.random() * 400 - 200,
+                    Math.random() * 30 + 100,
+                    Math.random() * 400 - 200
+                );
+                
+                // Scale the cloud randomly
+                const scale = Math.random() * 2 + 1;
+                cloud.scale.set(scale, scale * 0.6, scale);
+                
+                cloudGroup.add(cloud);
+            }
+            
+            scene.add(cloudGroup);
+            console.log("Clouds added successfully");
+            return cloudGroup;
+        } catch (error) {
+            console.error("Error adding clouds:", error);
+            return new THREE.Group(); // Return empty group on error
+        }
     }
 };
 
