@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REPO City - 3D FPS Simulation</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="loading-screen">
+            <div class="loading-content">
+                <h1>REPO City</h1>
+                <div class="progress-bar">
+                    <div class="progress-value"></div>
+                </div>
+                <p class="loading-text">Loading game assets...</p>
+            </div>
+        </div>
+        
+        <div id="hud">
+            <div class="health-container">
+                <div class="health-bar">
+                    <div class="health-value"></div>
+                </div>
+                <span class="health-text">100</span>
+            </div>
+            <div class="ammo-container">
+                <span class="ammo-count">30/120</span>
+            </div>
+            <div class="interaction-prompt" style="display: none;">
+                Press E to interact
+            </div>
+            <div class="crosshair">+</div>
+        </div>
+
+        <div id="dialogue-box" style="display: none;">
+            <div class="npc-name">NPC Name</div>
+            <div class="dialogue-text">Dialogue text appears here...</div>
+            <div class="dialogue-options">
+                <button class="dialogue-option">Response 1</button>
+                <button class="dialogue-option">Response 2</button>
+            </div>
+        </div>
+
+        <div id="game-over" style="display: none;">
+            <h2>Game Over</h2>
+            <button id="restart-button">Restart</button>
+        </div>
+    </div>
+    
+    <!-- Third-party libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cannon@0.6.2/build/cannon.min.js"></script>
+    
+    <!-- Three.js extras -->
+    <script>
+        // Wait for Three.js to load then add required components
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load additional Three.js components
+            const loadScript = function(url, callback) {
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = url;
+                script.onload = callback;
+                document.head.appendChild(script);
+            };
+            
+            // Load required Three.js components in sequence
+            loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js', function() {
+                loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js', function() {
+                    console.log('All Three.js components loaded');
+                    // Now load game scripts
+                    loadScript('js/utils.js', function() {
+                        loadScript('js/environment.js', function() {
+                            loadScript('js/npc.js', function() {
+                                loadScript('js/weapons.js', function() {
+                                    loadScript('js/player.js', function() {
+                                        loadScript('js/app.js', function() {
+                                            console.log('Game scripts loaded');
+                                            // Start the game
+                                            if (window.Game) {
+                                                window.gameInstance = new Game();
+                                            }
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
