@@ -12,9 +12,11 @@ class Game {
         // Game elements
         this.environment = null;
         this.player = null;
+        this.npcManager = null; // Add NPC manager
         
         // Game state
         this.isGameActive = false;
+        this._groundCreated = false;
         
         // Initialize the game
         this.init();
@@ -149,49 +151,102 @@ class Game {
     }
     
     startGame() {
-        debugLog("Game.startGame() called");
-        
+        console.log("Game.startGame() called");
         try {
-            // Set game as active
+            // Hide loading screen
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                loadingScreen.style.display = 'none';
+            }
+            
             this.isGameActive = true;
             
             // Create player
             this.setupPlayer();
             
-            // Request pointer lock
-            requestPointerLock();
+            // Create ground if not already present
+            this.createBasicGround();
             
-            debugLog("Game started successfully");
+            // Initialize NPC manager and spawn enemy
+            this.setupNPCs();
+            
+            // Lock pointer for first person controls
+            if (this.player && this.player.controls) {
+                if (typeof this.player.controls.lock === 'function') {
+                    console.log("Requesting pointer lock");
+                    this.player.controls.lock();
+                } else {
+                    console.error("Player controls lock function not available");
+                }
+            } else {
+                console.error("Player not properly initialized");
+            }
+            
+            // Show controls help
+            console.log("Movement Controls: WASD to move, Space to jump, Shift to sprint");
+            console.log("A REPO enemy has been spawned nearby!");
         } catch (error) {
-            debugLog(`ERROR: Failed to start game: ${error.message}`);
-            showError(`Failed to start game: ${error.message}`);
-            console.error(error);
+            console.error("Error starting game:", error);
         }
     }
     
     setupPlayer() {
-        debugLog("Setting up player");
-        
         try {
-            // Create player instance
+            // Create player
             this.player = new Player(this.camera, this.scene, this.world);
-            debugLog("Player created successfully");
             
-            // Update health display
-            document.querySelector('.health-value').style.width = '100%';
-            document.querySelector('.health-text').textContent = '100';
+            // Set initial camera position
+            this.camera.position.set(0, 2, 5);
+            
+            console.log("Player setup complete");
         } catch (error) {
-            debugLog(`ERROR: Failed to create player: ${error.message}`);
-            throw error;
+            console.error("Error setting up player:", error);
+        }
+    }
+    
+    setupNPCs() {
+        try {
+            // Create NPC manager
+            this.npcManager = new NPCManager(this.scene, this.world);
+            
+            // Spawn one REPO enemy
+            this.npcManager.spawnEnemy();
+            
+            console.log("NPCs and enemies initialized");
+        } catch (error) {
+            console.error("Error setting up NPCs:", error);
+        }
+    }
+    
+    createBasicGround() {
+        // Only create if not already present
+        if (!this._groundCreated) {
+            // Create a simple ground plane
+            const groundGeometry = new THREE.PlaneGeometry(100, 100);
+            const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            this.scene.add(ground);
+            
+            // Add to physics world if not already
+            const groundShape = new CANNON.Plane();
+            const groundBody = new CANNON.Body({ mass: 0 }); // Static body
+            groundBody.addShape(groundShape);
+            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+            this.world.addBody(groundBody);
+            
+            this._groundCreated = true;
+            console.log("Basic ground created");
         }
     }
     
     update() {
         try {
-            // Calculate delta time
-            const delta = Math.min(this.clock.getDelta(), 0.1);
+            // Get delta time
+            const delta = Math.min(this.clock.getDelta(), 0.1); // Cap delta to prevent large jumps
             
-            // Step physics world
+            // Update physics
             if (this.world) {
                 this.world.step(1/60, delta, 3);
             }
@@ -200,8 +255,14 @@ class Game {
             if (this.isGameActive && this.player) {
                 this.player.update(delta);
             }
+            
+            // Update NPCs and enemies
+            if (this.npcManager && this.player && this.player.body) {
+                const playerPosition = this.player.body.position;
+                this.npcManager.update(playerPosition, delta);
+            }
         } catch (error) {
-            debugLog(`ERROR: Update loop error: ${error.message}`);
+            console.error("Error in game update:", error);
         }
     }
     

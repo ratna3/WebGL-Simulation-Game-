@@ -322,5 +322,36 @@
             loadGameScripts();
         });
     </script>
+    
+    <!-- Add this at the bottom of your body tag, right before the closing </body> tag -->
+    <script>
+        // Add a debug button to re-trigger pointer lock if needed
+        window.addEventListener('DOMContentLoaded', () => {
+            const debugButton = document.createElement('button');
+            debugButton.style.position = 'fixed';
+            debugButton.style.bottom = '10px';
+            debugButton.style.left = '10px';
+            debugButton.style.zIndex = '1000';
+            debugButton.style.padding = '8px';
+            debugButton.style.backgroundColor = '#333';
+            debugButton.style.color = 'white';
+            debugButton.textContent = 'Restart Controls';
+            
+            debugButton.addEventListener('click', () => {
+                if (window.player && window.player.controls) {
+                    window.player.controls.lock();
+                    console.log("Manual pointer lock requested");
+                } else if (window.playerInstance && window.playerInstance.controls) {
+                    window.playerInstance.controls.lock();
+                    console.log("Manual pointer lock requested via playerInstance");
+                } else {
+                    console.error("Player controls not available");
+                    alert("Please start the game first");
+                }
+            });
+            
+            document.body.appendChild(debugButton);
+        });
+    </script>
 </body>
 </html>
