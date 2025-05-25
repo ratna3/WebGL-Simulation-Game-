@@ -9,6 +9,10 @@ class Player {
         this.health = 100;
         this.maxHealth = 100;
         this.alive = true;
+        this.dialogueLocked = false; // For dialogue system
+        
+        // Add weapon
+        this.weapon = null;
         
         // Movement properties
         this.moveSpeed = 50;      // Increased for better responsiveness
@@ -28,7 +32,8 @@ class Player {
             left: false,
             right: false,
             jump: false,
-            sprint: false
+            sprint: false,
+            interact: false // Add interaction key
         };
         
         this.onGround = false;
@@ -60,9 +65,21 @@ class Player {
             // Set up input handlers
             this.setupInputHandlers();
             
+            // Initialize weapon
+            this.setupWeapon();
+            
             console.log("Player initialized successfully");
         } catch (error) {
             console.error("Error initializing player:", error);
+        }
+    }
+    
+    setupWeapon() {
+        try {
+            this.weapon = new Weapon(this.scene, this.camera, this.world);
+            console.log("Player weapon initialized");
+        } catch (error) {
+            console.error("Error setting up weapon:", error);
         }
     }
     
@@ -98,20 +115,82 @@ class Player {
     
     setupControls() {
         try {
+            // Check if PointerLockControls is available
             if (typeof THREE.PointerLockControls === 'function') {
                 console.log("Creating PointerLockControls");
                 this.controls = new THREE.PointerLockControls(this.camera, document.body);
+                
+                // Add controls to scene so they work properly
+                this.scene.add(this.controls.getObject());
+                
+                // Set up pointer lock event handlers
+                this.setupPointerLockEvents();
+                
             } else {
-                console.error("THREE.PointerLockControls not found!");
-                alert("Movement controls could not be initialized. Please refresh the page.");
+                console.warn("THREE.PointerLockControls not available - using fallback");
+                // Create a fallback object that won't break the game
+                this.controls = {
+                    lock: () => console.log("Pointer lock not available"),
+                    unlock: () => console.log("Pointer lock not available"),
+                    isLocked: false
+                };
             }
         } catch (error) {
             console.error("Error setting up controls:", error);
+            // Create fallback controls
+            this.controls = {
+                lock: () => console.log("Controls unavailable"),
+                unlock: () => console.log("Controls unavailable"),
+                isLocked: false
+            };
         }
+    }
+    
+    setupPointerLockEvents() {
+        // Handle pointer lock changes
+        const onPointerLockChange = () => {
+            if (document.pointerLockElement === document.body) {
+                this.controls.isLocked = true;
+                console.log("Pointer lock acquired");
+            } else {
+                this.controls.isLocked = false;
+                console.log("Pointer lock released");
+            }
+        };
+        
+        const onPointerLockError = (event) => {
+            console.error("Pointer lock error:", event);
+        };
+        
+        document.addEventListener('pointerlockchange', onPointerLockChange);
+        document.addEventListener('pointerlockerror', onPointerLockError);
+        
+        // Also handle vendor prefixes
+        document.addEventListener('mozpointerlockchange', onPointerLockChange);
+        document.addEventListener('webkitpointerlockchange', onPointerLockChange);
+        document.addEventListener('mozpointerlockerror', onPointerLockError);
+        document.addEventListener('webkitpointerlockerror', onPointerLockError);
     }
     
     setupInputHandlers() {
         console.log("Setting up player input handlers");
+        
+        // Handle pointer lock request safely
+        document.addEventListener('click', (event) => {
+            // Only request pointer lock if not already locked and game is active
+            if (!this.dialogueLocked && this.controls && document.pointerLockElement !== document.body) {
+                // Add a small delay to avoid security errors
+                setTimeout(() => {
+                    if (this.controls && typeof this.controls.lock === 'function') {
+                        try {
+                            this.controls.lock();
+                        } catch (error) {
+                            console.warn("Could not acquire pointer lock:", error);
+                        }
+                    }
+                }, 100);
+            }
+        });
         
         // KEYBOARD INPUT HANDLERS - Simplified and more reliable
         
@@ -119,34 +198,53 @@ class Player {
         document.addEventListener('keydown', (event) => {
             if (!this.alive) return;
             
+            // Don't process movement if dialogue is active (except weapon controls)
+            if (this.dialogueLocked && !['KeyE', 'Tab', 'KeyR'].includes(event.code)) {
+                return;
+            }
+            
             switch(event.code) {
                 case 'KeyW':
                 case 'ArrowUp':
-                    this.keys.forward = true;
+                    if (!this.dialogueLocked) this.keys.forward = true;
                     event.preventDefault();
                     break;
                 case 'KeyS':
                 case 'ArrowDown':
-                    this.keys.backward = true;
+                    if (!this.dialogueLocked) this.keys.backward = true;
                     event.preventDefault();
                     break;
                 case 'KeyA':
                 case 'ArrowLeft':
-                    this.keys.left = true;
+                    if (!this.dialogueLocked) this.keys.left = true;
                     event.preventDefault();
                     break;
                 case 'KeyD':
                 case 'ArrowRight':
-                    this.keys.right = true;
+                    if (!this.dialogueLocked) this.keys.right = true;
                     event.preventDefault();
                     break;
                 case 'Space':
-                    this.keys.jump = true;
+                    if (!this.dialogueLocked) this.keys.jump = true;
                     event.preventDefault();
                     break;
                 case 'ShiftLeft': 
                 case 'ShiftRight': 
-                    this.keys.sprint = true;
+                    if (!this.dialogueLocked) this.keys.sprint = true;
+                    event.preventDefault();
+                    break;
+                case 'KeyE':
+                    this.keys.interact = true;
+                    this.handleInteraction();
+                    event.preventDefault();
+                    break;
+                // Weapon controls work even during dialogue for emergency situations
+                case 'Tab':
+                    // Weapon toggle handled by weapon class
+                    event.preventDefault();
+                    break;
+                case 'KeyR':
+                    // Reload handled by weapon class
                     event.preventDefault();
                     break;
             }
@@ -157,6 +255,10 @@ class Player {
                 console.log("Player velocity:", this.body.velocity);
                 console.log("Movement states:", this.keys);
                 console.log("On ground:", this.onGround);
+                if (this.weapon) {
+                    console.log("Weapon equipped:", this.weapon.isEquipped);
+                    console.log("Weapon ammo:", this.weapon.ammo);
+                }
             }
         });
         
@@ -186,12 +288,15 @@ class Player {
                 case 'ShiftRight': 
                     this.keys.sprint = false;
                     break;
+                case 'KeyE':
+                    this.keys.interact = false;
+                    break;
             }
         });
         
         // Handle pointer lock for camera control
         document.addEventListener('click', () => {
-            if (document.pointerLockElement !== document.body && this.controls) {
+            if (document.pointerLockElement !== document.body && this.controls && !this.dialogueLocked) {
                 this.controls.lock();
             }
         });
@@ -202,7 +307,23 @@ class Player {
         });
         
         console.log("Input handlers initialized");
-        console.log("Controls: W/A/S/D to move, Space to jump, Shift to sprint, P for debug info");
+        console.log("Controls: W/A/S/D to move, Space to jump, Shift to sprint, E to interact");
+        console.log("Weapon Controls: Tab to equip/holster, Left Click to shoot, R to reload");
+        console.log("Click anywhere to enable mouse look");
+    }
+    
+    handleInteraction() {
+        if (!window.game || !window.game.npcManager || !window.game.dialogueSystem) return;
+        
+        const playerPos = this.body.position;
+        const nearestNPC = window.game.npcManager.getNearestNPC(playerPos, 3);
+        
+        if (nearestNPC.npc && nearestNPC.distance < 3) {
+            console.log("Interacting with", nearestNPC.npc.name);
+            window.game.dialogueSystem.startDialogue(nearestNPC.npc);
+        } else {
+            console.log("No NPC nearby to interact with");
+        }
     }
     
     update(delta) {
@@ -212,11 +333,29 @@ class Player {
             // Check for ground contact
             this.checkGround();
             
-            // Process movement regardless of pointer lock for testing
-            this.processMovement(delta);
+            // Process movement only if not in dialogue
+            if (!this.dialogueLocked) {
+                this.processMovement(delta);
+            }
             
             // Update camera position to match physics body
             this.updateCamera();
+            
+            // Update weapon
+            if (this.weapon) {
+                this.weapon.update(delta);
+            }
+            
+            // Hide interaction prompt if moving away from NPCs
+            if (window.game && window.game.dialogueSystem) {
+                const playerPos = this.body.position;
+                const nearestNPC = window.game.npcManager ? 
+                    window.game.npcManager.getNearestNPC(playerPos, 3) : { distance: Infinity };
+                
+                if (nearestNPC.distance > 3) {
+                    window.game.dialogueSystem.hideInteractionPrompt();
+                }
+            }
             
             // Periodic debug logging
             if (this.debug && (this.keys.forward || this.keys.backward || this.keys.left || this.keys.right)) {

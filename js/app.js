@@ -7,16 +7,21 @@ class Game {
         this.scene = null;
         this.renderer = null;
         this.camera = null;
-        this.world = null; // Physics world
+        this.world = null;
         
         // Game elements
         this.environment = null;
         this.player = null;
-        this.npcManager = null; // Add NPC manager
+        this.npcManager = null;
+        this.dialogueSystem = null;
+        this.missionManager = null; // Add mission manager
         
         // Game state
         this.isGameActive = false;
-        this._groundCreated = false;
+        
+        // Player health system
+        this.playerHealth = 100;
+        this.maxPlayerHealth = 100;
         
         // Initialize the game
         this.init();
@@ -34,6 +39,10 @@ class Game {
             
             this.setupBasicEnvironment();
             debugLog("Basic environment setup complete");
+            
+            // Initialize mission manager
+            this.missionManager = new MissionManager(this);
+            debugLog("Mission manager initialized");
             
             // Make instance globally available
             window.game = this;
@@ -84,21 +93,26 @@ class Game {
     
     setupPhysics() {
         try {
-            // Create physics world
+            // Create physics world with better settings
             this.world = new CANNON.World();
-            this.world.gravity.set(0, -9.8, 0); // Earth gravity
+            this.world.gravity.set(0, -9.8, 0);
             
-            // Configure solver
-            this.world.solver.iterations = 10;
+            // Better solver configuration
+            this.world.solver.iterations = 15;
             this.world.broadphase = new CANNON.NaiveBroadphase();
             this.world.allowSleep = true;
             
-            // Add ground plane
-            const groundShape = new CANNON.Plane();
-            const groundBody = new CANNON.Body({ mass: 0 }); // Static body
-            groundBody.addShape(groundShape);
-            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-            this.world.addBody(groundBody);
+            // Set default contact material for better stability
+            const defaultMaterial = new CANNON.Material('default');
+            const defaultContactMaterial = new CANNON.ContactMaterial(defaultMaterial, defaultMaterial, {
+                friction: 0.3,
+                restitution: 0.0,
+                contactEquationStiffness: 1e8,
+                contactEquationRelaxation: 3
+            });
+            this.world.addContactMaterial(defaultContactMaterial);
+            this.world.defaultContactMaterial = defaultContactMaterial;
+            
         } catch (error) {
             debugLog(`ERROR: Physics setup failed: ${error.message}`);
             throw new Error(`Failed to initialize physics: ${error.message}`);
@@ -110,40 +124,33 @@ class Game {
             // Set sky color
             this.scene.background = new THREE.Color(0x87CEEB);
             
-            // Create ground plane
-            const planeGeometry = new THREE.PlaneGeometry(100, 100);
-            const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x336633 });
-            const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-            plane.rotation.x = -Math.PI / 2;
-            plane.receiveShadow = true;
-            this.scene.add(plane);
-            
             // Add ambient light
-            const ambientLight = new THREE.AmbientLight(0x666666);
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
             this.scene.add(ambientLight);
             
-            // Add directional light
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-            directionalLight.position.set(5, 10, 7.5);
+            // Add directional light (sun)
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(50, 100, 50);
             directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.1;
+            directionalLight.shadow.camera.far = 200;
+            directionalLight.shadow.camera.left = -100;
+            directionalLight.shadow.camera.right = 100;
+            directionalLight.shadow.camera.top = 100;
+            directionalLight.shadow.camera.bottom = -100;
             this.scene.add(directionalLight);
             
-            // Add some boxes for testing
-            for (let i = 0; i < 10; i++) {
-                const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-                const boxMaterial = new THREE.MeshStandardMaterial({
-                    color: Math.random() * 0xffffff
-                });
-                const box = new THREE.Mesh(boxGeometry, boxMaterial);
-                box.position.set(
-                    Math.random() * 20 - 10,
-                    0.5,
-                    Math.random() * 20 - 10
-                );
-                box.castShadow = true;
-                box.receiveShadow = true;
-                this.scene.add(box);
-            }
+            // Add secondary light for better illumination
+            const secondaryLight = new THREE.DirectionalLight(0x6677aa, 0.3);
+            secondaryLight.position.set(-30, 50, -30);
+            this.scene.add(secondaryLight);
+            
+            // Create complete city environment
+            this.environment = new Environment(this.scene, this.world);
+            this.environment.init();
+            
         } catch (error) {
             debugLog(`ERROR: Environment setup failed: ${error.message}`);
             throw new Error(`Failed to set up environment: ${error.message}`);
@@ -164,29 +171,30 @@ class Game {
             // Create player
             this.setupPlayer();
             
-            // Create ground if not already present
-            this.createBasicGround();
+            // Initialize dialogue system
+            this.setupDialogueSystem();
             
-            // Initialize NPC manager and spawn enemy
+            // Initialize NPC manager and spawn undercover NPCs
             this.setupNPCs();
             
-            // Lock pointer for first person controls
-            if (this.player && this.player.controls) {
-                if (typeof this.player.controls.lock === 'function') {
-                    console.log("Requesting pointer lock");
-                    this.player.controls.lock();
-                } else {
-                    console.error("Player controls lock function not available");
-                }
-            } else {
-                console.error("Player not properly initialized");
-            }
+            // Don't immediately request pointer lock - let user click first
+            console.log("Game started - click in the game area to enable mouse look");
             
-            // Show controls help
-            console.log("Movement Controls: WASD to move, Space to jump, Shift to sprint");
-            console.log("A REPO enemy has been spawned nearby!");
+            // Show mission briefing
+            this.showMissionBriefing();
+            
         } catch (error) {
             console.error("Error starting game:", error);
+            showError(`Failed to start game: ${error.message}`);
+        }
+    }
+    
+    setupDialogueSystem() {
+        try {
+            this.dialogueSystem = new DialogueSystem();
+            console.log("Dialogue system initialized");
+        } catch (error) {
+            console.error("Error setting up dialogue system:", error);
         }
     }
     
@@ -206,39 +214,196 @@ class Game {
     
     setupNPCs() {
         try {
+            // Check if NPCManager is available
+            if (typeof NPCManager === 'undefined') {
+                console.error("NPCManager class not loaded");
+                throw new Error("NPCManager class not available - check if npc.js loaded correctly");
+            }
+            
             // Create NPC manager
             this.npcManager = new NPCManager(this.scene, this.world);
+            console.log("NPC Manager created successfully");
             
-            // Spawn one REPO enemy
-            this.npcManager.spawnEnemy();
+            // Spawn undercover mission NPCs
+            this.npcManager.spawnUndercoverNPCs();
+            console.log("Undercover NPCs spawned");
             
-            console.log("NPCs and enemies initialized");
+            // Spawn enemies in parks near trees
+            const enemyCount = this.npcManager.spawnEnemiesInParks();
+            console.log(`${enemyCount} enemies spawned in parks`);
+            
+            console.log("City NPCs and enemies initialized");
         } catch (error) {
             console.error("Error setting up NPCs:", error);
+            throw error; // Re-throw to handle in startGame
         }
     }
     
-    createBasicGround() {
-        // Only create if not already present
-        if (!this._groundCreated) {
-            // Create a simple ground plane
-            const groundGeometry = new THREE.PlaneGeometry(100, 100);
-            const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
-            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-            ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
-            this.scene.add(ground);
-            
-            // Add to physics world if not already
-            const groundShape = new CANNON.Plane();
-            const groundBody = new CANNON.Body({ mass: 0 }); // Static body
-            groundBody.addShape(groundShape);
-            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-            this.world.addBody(groundBody);
-            
-            this._groundCreated = true;
-            console.log("Basic ground created");
+    restartMission() {
+        // Reset player health
+        this.playerHealth = this.maxPlayerHealth;
+        this.updateHealthBar();
+        
+        // Reset mission state
+        this.missionManager = new MissionManager(this);
+        
+        // Clear existing NPCs and enemies
+        this.npcManager.npcs.forEach(npc => {
+            if (npc.body) this.world.removeBody(npc.body);
+            if (npc.group) this.scene.remove(npc.group);
+        });
+        this.npcManager.enemies.forEach(enemy => {
+            if (enemy.body) this.world.removeBody(enemy.body);
+            if (enemy.group) this.scene.remove(enemy.group);
+        });
+        
+        // Reset arrays
+        this.npcManager.npcs = [];
+        this.npcManager.enemies = [];
+        
+        // Respawn
+        this.setupNPCs();
+        
+        // Reset player position and state
+        if (this.player) {
+            this.player.body.position.set(0, 5, 0);
+            this.player.body.velocity.set(0, 0, 0);
         }
+        
+        this.isGameActive = true;
+        console.log("Mission restarted");
+    }
+    
+    showMissionBriefing() {
+        // Get agent name from the naming screen
+        const agentName = window.getAgentName ? window.getAgentName() : "Agent Smith";
+        
+        // Create mission briefing overlay
+        const briefing = document.createElement('div');
+        briefing.id = 'mission-briefing';
+        briefing.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            font-family: 'Courier New', monospace;
+        `;
+        
+        briefing.innerHTML = `
+            <div style="max-width: 700px; text-align: center; padding: 20px;">
+                <h1 style="color: #ff3e3e; margin-bottom: 30px;">MISSION BRIEFING</h1>
+                <h2 style="margin-bottom: 20px;">Operation: Undercover Agent</h2>
+                
+                <div style="text-align: left; margin-bottom: 30px; line-height: 1.6;">
+                    <p><strong>${agentName},</strong></p>
+                    <p>You are tasked with infiltrating a criminal organization. Use dialogue to gather intel, but be prepared to defend yourself.</p>
+                    
+                    <p><strong>Objectives:</strong></p>
+                    <ul>
+                        <li>Gather intelligence from criminal contacts</li>
+                        <li>Maintain your cover identity as ${agentName}</li>
+                        <li>Eliminate hostile targets when discovered</li>
+                        <li>Avoid civilian casualties</li>
+                    </ul>
+                    
+                    <p><strong>Key Personnel:</strong></p>
+                    <ul>
+                        <li><span style="color: #ff4444;">Criminals</span> - Your targets, gather intel or eliminate</li>
+                        <li><span style="color: #4444ff;">Police</span> - Avoid suspicion, maintain cover</li>
+                        <li><span style="color: #888888;">Civilians</span> - Innocent bystanders, do not harm</li>
+                        <li><span style="color: #ff6600;">REPO Units</span> - Highly dangerous, eliminate on sight</li>
+                    </ul>
+                    
+                    <p><strong>Controls:</strong></p>
+                    <ul>
+                        <li>WASD - Move around</li>
+                        <li>Mouse - Look around</li>
+                        <li>E - Interact with people</li>
+                        <li>Tab - Equip/Holster weapon</li>
+                        <li>Left Click - Shoot (when weapon equipped)</li>
+                        <li>R - Reload weapon</li>
+                    </ul>
+                    
+                    <p><strong>WARNING:</strong> Using your weapon will blow your cover. Use it only when necessary!</p>
+                </div>
+                
+                <button onclick="this.parentElement.parentElement.remove()" 
+                        style="background: #ff3e3e; color: white; border: none; padding: 15px 30px; 
+                               font-size: 18px; border-radius: 5px; cursor: pointer;">
+                    BEGIN MISSION
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(briefing);
+        
+        console.log(`Mission Controls: WASD to move, E to interact, Tab for weapon, Left Click to shoot`);
+        console.log(`Your cover identity: ${agentName} working undercover`);
+        console.log("Weapon is initially holstered - press Tab to equip when needed");
+    }
+    
+    showGameOverScreen() {
+        const agentName = window.getAgentName ? window.getAgentName() : "Agent Smith";
+        
+        const gameOverOverlay = document.createElement('div');
+        gameOverOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-family: 'Courier New', monospace;
+        `;
+        
+        gameOverOverlay.innerHTML = `
+            <div style="text-align: center; color: white;">
+                <h1 style="color: #ff0000; font-size: 64px; margin-bottom: 20px; text-shadow: 0 0 20px #ff0000;">
+                    MISSION FAILED
+                </h1>
+                
+                <h2 style="color: #ff3e3e; font-size: 32px; margin-bottom: 30px;">
+                    Agent ${agentName} - K.I.A.
+                </h2>
+                
+                <p style="font-size: 18px; margin-bottom: 30px; color: #ccc;">
+                    ${agentName} was eliminated by REPO forces.<br>
+                    The criminal organization remains active.
+                </p>
+                
+                <button onclick="this.restartGame()" 
+                        style="background: #ff3e3e; color: white; border: none; padding: 15px 30px; 
+                               font-size: 18px; border-radius: 5px; cursor: pointer; margin-right: 15px;">
+                    RETRY MISSION
+                </button>
+                
+                <button onclick="window.location.reload()" 
+                        style="background: #666; color: white; border: none; padding: 15px 30px; 
+                               font-size: 18px; border-radius: 5px; cursor: pointer;">
+                    NEW AGENT
+                </button>
+            </div>
+        `;
+        
+        // Add restart functionality
+        gameOverOverlay.querySelector('button').onclick = () => {
+            document.body.removeChild(gameOverOverlay);
+            this.restartMission();
+        };
+        
+        document.body.appendChild(gameOverOverlay);
     }
     
     update() {
@@ -249,6 +414,11 @@ class Game {
             // Update physics
             if (this.world) {
                 this.world.step(1/60, delta, 3);
+            }
+            
+            // Update environment
+            if (this.environment) {
+                this.environment.update(delta);
             }
             
             // Update player
@@ -264,6 +434,84 @@ class Game {
         } catch (error) {
             console.error("Error in game update:", error);
         }
+    }
+    
+    playerTakeDamage(damage) {
+        if (this.playerHealth <= 0) return; // Already dead
+        
+        this.playerHealth = Math.max(0, this.playerHealth - damage);
+        console.log(`Player takes ${damage} damage. Health: ${this.playerHealth}/${this.maxPlayerHealth}`);
+        
+        // Update health bar UI
+        this.updateHealthBar();
+        
+        // Screen flash effect for damage
+        this.createDamageEffect();
+        
+        if (this.playerHealth <= 0) {
+            this.gameOver();
+        }
+    }
+    
+    updateHealthBar() {
+        const healthBar = document.querySelector('.health-value');
+        const healthText = document.querySelector('.health-text');
+        
+        if (healthBar && healthText) {
+            const healthPercent = (this.playerHealth / this.maxPlayerHealth) * 100;
+            healthBar.style.width = `${healthPercent}%`;
+            healthText.textContent = `${this.playerHealth}`;
+            
+            // Change color based on health level
+            if (healthPercent > 60) {
+                healthBar.style.backgroundColor = '#ff3e3e'; // Red
+            } else if (healthPercent > 30) {
+                healthBar.style.backgroundColor = '#ff8800'; // Orange
+            } else {
+                healthBar.style.backgroundColor = '#ff0000'; // Dark red
+            }
+        }
+    }
+    
+    createDamageEffect() {
+        // Create red screen flash effect
+        const damageOverlay = document.createElement('div');
+        damageOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 0, 0, 0.3);
+            pointer-events: none;
+            z-index: 200;
+            animation: damageFlash 0.3s ease-out;
+        `;
+        
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes damageFlash {
+                0% { opacity: 0.6; }
+                100% { opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(damageOverlay);
+        
+        // Remove overlay after animation
+        setTimeout(() => {
+            document.body.removeChild(damageOverlay);
+        }, 300);
+    }
+    
+    gameOver() {
+        console.log("Game Over - Player died!");
+        this.isGameActive = false;
+        
+        // Show game over screen
+        this.showGameOverScreen();
     }
     
     render() {

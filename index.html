@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REPO City - 3D FPS Simulation</title>
+    <title>REPO City - Undercover Agent</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
         body {
@@ -148,11 +148,240 @@
             z-index: 1000;
             display: none;
         }
+        
+        /* Dialogue System Styles */
+        #dialogue-box {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 700px;
+            background: rgba(0,0,0,0.9);
+            border: 2px solid #ff3e3e;
+            border-radius: 8px;
+            padding: 20px;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            z-index: 100;
+        }
+        
+        .npc-name {
+            color: #ff3e3e;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        
+        .dialogue-text {
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            color: #eee;
+        }
+        
+        .dialogue-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .dialogue-option {
+            background: rgba(255, 62, 62, 0.2);
+            border: 1px solid #ff3e3e;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+        }
+        
+        .dialogue-option:hover {
+            background: rgba(255, 62, 62, 0.4);
+            border-color: #ff6666;
+        }
+        
+        #cover-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            z-index: 100;
+            border: 1px solid #444;
+        }
+        
+        #interaction-prompt {
+            position: fixed;
+            bottom: 200px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: 1px solid #ff3e3e;
+            z-index: 50;
+            display: none;
+        }
+        
+        /* Agent Naming Screen */
+        #agent-naming-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #000000 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1100;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .naming-content {
+            text-align: center;
+            color: white;
+            max-width: 600px;
+            padding: 40px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ff3e3e;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(255, 62, 62, 0.3);
+        }
+        
+        .naming-content h1 {
+            color: #ff3e3e;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(255, 62, 62, 0.8);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from { text-shadow: 0 0 20px rgba(255, 62, 62, 0.8); }
+            to { text-shadow: 0 0 30px rgba(255, 62, 62, 1), 0 0 40px rgba(255, 62, 62, 0.8); }
+        }
+        
+        .naming-content h2 {
+            color: #ffffff;
+            font-size: 24px;
+            margin-bottom: 30px;
+            font-weight: normal;
+        }
+        
+        .naming-content p {
+            color: #cccccc;
+            font-size: 16px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        
+        #agent-name-input {
+            width: 300px;
+            padding: 15px;
+            font-size: 18px;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #ff3e3e;
+            border-radius: 8px;
+            color: white;
+            margin-bottom: 30px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        
+        #agent-name-input:focus {
+            border-color: #ff6666;
+            box-shadow: 0 0 15px rgba(255, 62, 62, 0.5);
+            background: rgba(0, 0, 0, 0.9);
+        }
+        
+        #agent-name-input::placeholder {
+            color: #666;
+        }
+        
+        #confirm-name-button {
+            background: linear-gradient(135deg, #ff3e3e 0%, #cc3333 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-family: 'Courier New', monospace;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(255, 62, 62, 0.3);
+        }
+        
+        #confirm-name-button:hover {
+            background: linear-gradient(135deg, #ff5555 0%, #ee4444 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 62, 62, 0.4);
+        }
+        
+        #confirm-name-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(255, 62, 62, 0.3);
+        }
+        
+        .agent-badge {
+            display: inline-block;
+            background: #ffd700;
+            color: #000;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 <body>
     <div id="game-container">
-        <div id="loading-screen">
+        <!-- Agent Naming Screen (appears first) -->
+        <div id="agent-naming-screen">
+            <div class="naming-content">
+                <div class="agent-badge">Classified Operation</div>
+                <h1>REPO CITY</h1>
+                <h2>Agent Identity Assignment</h2>
+                
+                <p>
+                    Welcome to the Undercover Operations Division.<br>
+                    You are about to infiltrate a dangerous criminal organization.<br><br>
+                    Please enter your agent codename for this mission:
+                </p>
+                
+                <input type="text" 
+                       id="agent-name-input" 
+                       placeholder="Enter Agent Codename" 
+                       maxlength="20"
+                       autocomplete="off">
+                
+                <br>
+                
+                <button id="confirm-name-button" onclick="confirmAgentName()">
+                    Confirm Identity
+                </button>
+                
+                <p style="font-size: 12px; color: #666; margin-top: 20px;">
+                    * Your codename will be used throughout the mission for identification
+                </p>
+            </div>
+        </div>
+        
+        <div id="loading-screen" style="display: none;">
             <div class="loading-content">
                 <h1>REPO City</h1>
                 <div class="progress-bar">
@@ -169,11 +398,30 @@
                 <div class="health-value"></div>
             </div>
             <div class="health-text">100</div>
-            <div class="ammo-count">30/120</div>
+            <div class="ammo-count">Weapon Holstered</div>
         </div>
         
         <div id="error-message"></div>
         <div id="debug-info"></div>
+        
+        <!-- Dialogue Box -->
+        <div id="dialogue-box" style="display:none;">
+            <div class="npc-name" id="npc-name">NPC Name</div>
+            <div class="dialogue-text" id="dialogue-text">Dialogue goes here...</div>
+            <div class="dialogue-options" id="dialogue-options">
+                <!-- Options will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <!-- Cover Status -->
+        <div id="cover-status">
+            Stealth Mode: <span id="stealth-status">OFF</span>
+        </div>
+        
+        <!-- Interaction Prompt -->
+        <div id="interaction-prompt">
+            Press <strong>E</strong> to interact
+        </div>
     </div>
     
     <!-- Load libraries first -->
@@ -250,18 +498,106 @@
                 
             document.body.requestPointerLock();
         }
-    </script>
-    
-    <!-- Load game scripts -->
-    <script>
+        
+        // Agent naming functionality
+        let agentName = "Agent Smith"; // Default fallback name
+        
+        function confirmAgentName() {
+            const nameInput = document.getElementById('agent-name-input');
+            const enteredName = nameInput.value.trim();
+            
+            if (enteredName && enteredName.length >= 2) {
+                agentName = enteredName;
+                localStorage.setItem('agentName', agentName);
+                
+                // Hide naming screen and show loading screen
+                document.getElementById('agent-naming-screen').style.display = 'none';
+                document.getElementById('loading-screen').style.display = 'flex';
+                
+                console.log(`Agent identity confirmed: ${agentName}`);
+                
+                // Start loading the game scripts
+                if (typeof loadGameScripts === 'function') {
+                    loadGameScripts();
+                } else {
+                    // Fallback - wait a bit for scripts to be available
+                    setTimeout(() => {
+                        if (typeof loadGameScripts === 'function') {
+                            loadGameScripts();
+                        } else {
+                            console.error("loadGameScripts function not available");
+                        }
+                    }, 100);
+                }
+            } else {
+                // Show error for invalid name
+                nameInput.style.borderColor = '#ff0000';
+                nameInput.style.boxShadow = '0 0 15px rgba(255, 0, 0, 0.5)';
+                nameInput.placeholder = "Please enter at least 2 characters";
+                
+                // Reset after a delay
+                setTimeout(() => {
+                    nameInput.style.borderColor = '#ff3e3e';
+                    nameInput.style.boxShadow = 'none';
+                    nameInput.placeholder = "Enter Agent Codename";
+                }, 2000);
+            }
+        }
+        
+        // Allow Enter key to confirm name
+        document.addEventListener('DOMContentLoaded', () => {
+            const nameInput = document.getElementById('agent-name-input');
+            const confirmButton = document.getElementById('confirm-name-button');
+            
+            nameInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    confirmAgentName();
+                }
+            });
+            
+            // Focus on input when page loads
+            setTimeout(() => {
+                nameInput.focus();
+            }, 500);
+            
+            // Add some randomized placeholder suggestions
+            const suggestions = [
+                "Agent Phoenix", "Agent Storm", "Agent Shadow", "Agent Viper", 
+                "Agent Falcon", "Agent Wolf", "Agent Raven", "Agent Steel",
+                "Agent Ghost", "Agent Blade", "Agent Nova", "Agent Titan"
+            ];
+            
+            let suggestionIndex = 0;
+            setInterval(() => {
+                if (document.activeElement !== nameInput) {
+                    nameInput.placeholder = suggestions[suggestionIndex];
+                    suggestionIndex = (suggestionIndex + 1) % suggestions.length;
+                }
+            }, 3000);
+        });
+        
+        // Function to get agent name (for use in other scripts)
+        function getAgentName() {
+            return agentName || localStorage.getItem('agentName') || "Agent Smith";
+        }
+        
+        // Make agent name globally available
+        window.getAgentName = getAgentName;
+        
         debugLog("Loading game scripts...");
         
         // Function to load game scripts in sequence
         function loadGameScripts() {
             const scripts = [
                 'js/utils.js',
+                'js/buildings/buildingTextures.js',
+                'js/buildings/buildingSystem.js',
+                'js/design/characterDesign.js',
+                'js/city/cityGenerator.js',
+                'js/game/missionManager.js',
                 'js/environment.js',
-                'js/npc.js',
+                'js/dialogue.js',
+                'js/npc.js',                    // Load NPC before weapons and player
                 'js/weapons.js',
                 'js/player.js',
                 'js/app.js'
@@ -272,9 +608,40 @@
             
             function loadNextScript(index) {
                 if (index >= totalScripts) {
-                    // All scripts loaded
                     debugLog("All game scripts loaded successfully");
-                    document.querySelector('.loading-text').textContent = "Game loaded! Click START to begin.";
+                    
+                    // Verify critical classes are loaded
+                    const requiredClasses = ['NPCManager', 'Player', 'Weapon', 'MissionManager'];
+                    const missingClasses = requiredClasses.filter(className => typeof window[className] === 'undefined');
+                    
+                    if (missingClasses.length > 0) {
+                        console.error("Missing required classes:", missingClasses);
+                        showError(`Missing required game classes: ${missingClasses.join(', ')}`);
+                        return;
+                    }
+                    
+                    // Test texture system after all scripts are loaded
+                    setTimeout(() => {
+                        try {
+                            console.log("Testing BuildingTextures...");
+                            if (typeof BuildingTextures !== 'undefined') {
+                                const textureTest = BuildingTextures.getInstance();
+                                console.log("Texture system test passed:", textureTest.isInitialized);
+                                
+                                // Force initialize if not ready
+                                if (!textureTest.isInitialized) {
+                                    console.log("Force initializing textures...");
+                                    textureTest.createAllTextures();
+                                }
+                            } else {
+                                console.error("BuildingTextures class not available");
+                            }
+                        } catch (error) {
+                            console.error("Texture system test failed:", error);
+                        }
+                    }, 200);
+                    
+                    document.querySelector('.loading-text').textContent = "Game loaded! Click START to begin your undercover mission.";
                     document.getElementById('start-button').style.display = "block";
                     return;
                 }
@@ -285,10 +652,21 @@
                 script.onload = function() {
                     loaded++;
                     const progress = Math.floor((loaded / totalScripts) * 100);
-                    Utils?.updateLoadingProgress?.(progress) || 
-                        (document.querySelector('.progress-value').style.width = progress + '%');
+                    document.querySelector('.progress-value').style.width = progress + '%';
                     
                     debugLog(`Loaded ${scripts[index]} (${loaded}/${totalScripts})`);
+                    
+                    // Verify specific critical scripts loaded correctly
+                    if (scripts[index].includes('npc.js')) {
+                        setTimeout(() => {
+                            if (typeof NPCManager !== 'undefined') {
+                                console.log("NPCManager class loaded successfully");
+                            } else {
+                                console.error("NPCManager class failed to load from npc.js");
+                            }
+                        }, 50);
+                    }
+                    
                     loadNextScript(index + 1);
                 };
                 
@@ -300,13 +678,12 @@
                 document.body.appendChild(script);
             }
             
-            // Start loading the scripts
             loadNextScript(0);
         }
         
         // Start loading scripts when page is loaded
         window.addEventListener('DOMContentLoaded', function() {
-            debugLog("DOM loaded, starting script loading");
+            debugLog("DOM loaded, agent naming screen ready");
             
             // Check if Three.js loaded properly
             if (typeof THREE === 'undefined') {
@@ -318,8 +695,8 @@
             // Initialize debug tools
             document.getElementById('debug-info').innerHTML = "<h3>Debug Log</h3>";
             
-            // Begin loading game scripts
-            loadGameScripts();
+            // Don't start loading scripts automatically - wait for agent name confirmation
+            debugLog("Waiting for agent name confirmation...");
         });
     </script>
     
