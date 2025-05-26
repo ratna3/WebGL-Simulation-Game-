@@ -96,9 +96,6 @@ class CityGenerator {
         // Add city boundaries
         this.createCityBoundaries();
         
-        // Add many more varied trees along city sides
-        this.addCitySideTrees();
-        
         // Add road trees
         this.addRoadTrees();
         
@@ -303,149 +300,75 @@ class CityGenerator {
         // Add city boundaries
         this.createCityBoundaries();
         
-        // Add many more varied trees along city sides
-        this.addCitySideTrees();
-        
         // Add road trees
         this.addRoadTrees();
         
         console.log("City generation complete!");
     }
     
-    addCitySideTrees() {
-        console.log("Adding varied-sized trees along city sides...");
+    createCityGround() {
+        // Create a single large ground plane to prevent glitching
+        const groundSize = this.citySize + 100;
+        const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize);
         
-        const cityHalf = this.citySize / 2;
-        const treeSpacing = 8; // Distance between trees
-        const sideOffset = 15; // How far from city edge to place trees
-        
-        // Define tree size variations
-        const treeSizes = [
-            { height: 12, radius: 5, trunkHeight: 6, trunkRadius: 0.6 }, // Large trees
-            { height: 8, radius: 3.5, trunkHeight: 4, trunkRadius: 0.4 }, // Medium trees
-            { height: 15, radius: 6, trunkHeight: 8, trunkRadius: 0.8 }, // Extra large trees
-            { height: 6, radius: 2.5, trunkHeight: 3, trunkRadius: 0.3 }, // Small trees
-            { height: 20, radius: 8, trunkHeight: 12, trunkRadius: 1.0 }, // Giant trees
-            { height: 10, radius: 4, trunkHeight: 5, trunkRadius: 0.5 }  // Standard trees
-        ];
-        
-        // North side trees
-        for (let x = -cityHalf; x <= cityHalf; x += treeSpacing + Math.random() * 4) {
-            const z = cityHalf + sideOffset + Math.random() * 10;
-            const sizeVariant = treeSizes[Math.floor(Math.random() * treeSizes.length)];
-            this.createVariedTree(x, z, sizeVariant);
-        }
-        
-        // South side trees
-        for (let x = -cityHalf; x <= cityHalf; x += treeSpacing + Math.random() * 4) {
-            const z = -cityHalf - sideOffset - Math.random() * 10;
-            const sizeVariant = treeSizes[Math.floor(Math.random() * treeSizes.length)];
-            this.createVariedTree(x, z, sizeVariant);
-        }
-        
-        // East side trees
-        for (let z = -cityHalf; z <= cityHalf; z += treeSpacing + Math.random() * 4) {
-            const x = cityHalf + sideOffset + Math.random() * 10;
-            const sizeVariant = treeSizes[Math.floor(Math.random() * treeSizes.length)];
-            this.createVariedTree(x, z, sizeVariant);
-        }
-        
-        // West side trees
-        for (let z = -cityHalf; z <= cityHalf; z += treeSpacing + Math.random() * 4) {
-            const x = -cityHalf - sideOffset - Math.random() * 10;
-            const sizeVariant = treeSizes[Math.floor(Math.random() * treeSizes.length)];
-            this.createVariedTree(x, z, sizeVariant);
-        }
-        
-        // Add some random scattered trees in corners and gaps
-        for (let i = 0; i < 30; i++) {
-            const cornerX = (Math.random() - 0.5) * (cityHalf + 50);
-            const cornerZ = (Math.random() - 0.5) * (cityHalf + 50);
-            
-            // Only place if far enough from city center
-            if (Math.abs(cornerX) > cityHalf - 20 || Math.abs(cornerZ) > cityHalf - 20) {
-                const sizeVariant = treeSizes[Math.floor(Math.random() * treeSizes.length)];
-                this.createVariedTree(cornerX, cornerZ, sizeVariant);
-            }
-        }
-        
-        console.log(`Added varied-sized trees around city perimeter`);
-    }
-    
-    createVariedTree(x, z, treeSize) {
+        // Use a simple material if textures fail
+        let groundMaterial;
         try {
-            // Create tree trunk with specified size
-            const trunkGeometry = new THREE.CylinderGeometry(
-                treeSize.trunkRadius * 0.8, 
-                treeSize.trunkRadius, 
-                treeSize.trunkHeight, 
-                8
-            );
-            
-            // Vary trunk color slightly
-            const trunkColors = [0x8B4513, 0x654321, 0x5D4037, 0x795548];
-            const trunkColor = trunkColors[Math.floor(Math.random() * trunkColors.length)];
-            
-            const trunkMaterial = new THREE.MeshStandardMaterial({
-                color: trunkColor,
-                roughness: 0.9
+            const concreteTexture = this.textureSystem.getTexture('concrete');
+            groundMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2D5016,
+                roughness: 0.8,
+                map: concreteTexture
             });
-            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-            trunk.position.set(x, treeSize.trunkHeight / 2, z);
-            trunk.castShadow = true;
-            this.scene.add(trunk);
-            
-            // Create tree canopy with specified size
-            const canopyGeometry = new THREE.SphereGeometry(treeSize.radius, 8, 6);
-            
-            // Vary canopy color and shape
-            const canopyColors = [0x228B22, 0x32CD32, 0x006400, 0x2E7D32, 0x1B5E20];
-            const canopyColor = canopyColors[Math.floor(Math.random() * canopyColors.length)];
-            
-            const canopyMaterial = new THREE.MeshStandardMaterial({
-                color: canopyColor,
+        } catch (error) {
+            console.warn("Failed to load ground texture, using solid color:", error);
+            groundMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2D5016,
                 roughness: 0.8
             });
-            const canopy = new THREE.Mesh(canopyGeometry, canopyMaterial);
-            
-            // Position canopy with some variation
-            const canopyHeight = treeSize.trunkHeight + treeSize.radius * 0.7;
-            canopy.position.set(
-                x + (Math.random() - 0.5) * 1, // Slight x offset
-                canopyHeight,
-                z + (Math.random() - 0.5) * 1  // Slight z offset
-            );
-            canopy.castShadow = true;
-            canopy.receiveShadow = true;
-            
-            // Slightly deform canopy for more natural look
-            canopy.scale.x = 0.8 + Math.random() * 0.4;
-            canopy.scale.y = 0.9 + Math.random() * 0.2;
-            canopy.scale.z = 0.8 + Math.random() * 0.4;
-            
-            this.scene.add(canopy);
-            
-            // Add tree physics for larger trees only
-            if (treeSize.trunkRadius > 0.4) {
-                const treeShape = new CANNON.Cylinder(treeSize.trunkRadius, treeSize.trunkRadius, treeSize.trunkHeight, 8);
-                const treeBody = new CANNON.Body({ mass: 0 });
-                treeBody.addShape(treeShape);
-                treeBody.position.set(x, treeSize.trunkHeight / 2, z);
-                this.world.addBody(treeBody);
+        }
+        
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.1;
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+        
+        // Add ground physics
+        const groundShape = new CANNON.Plane();
+        const groundBody = new CANNON.Body({ 
+            mass: 0,
+            material: new CANNON.Material({ friction: 0.8, restitution: 0 })
+        });
+        groundBody.addShape(groundShape);
+        groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+        groundBody.position.set(0, -0.1, 0);
+        this.world.addBody(groundBody);
+        
+        console.log("City ground created");
+    }
+    
+    generateAllBlocks() {
+        const halfGrid = Math.floor(this.gridSize / 2);
+        
+        for (let x = -halfGrid; x <= halfGrid; x++) {
+            for (let z = -halfGrid; z <= halfGrid; z++) {
+                const worldX = x * this.blockSize;
+                const worldZ = z * this.blockSize;
+                const blockType = this.cityGrid[x][z];
+                
+                switch (blockType) {
+                    case 'road':
+                        this.createRoadBlock(worldX, worldZ);
+                        break;
+                    case 'park':
+                        this.createParkBlock(worldX, worldZ);
+                        break;
+                    case 'building':
+                        this.createBuildingBlock(worldX, worldZ);
+                        break;
+                }
             }
-            
-            // Store tree data
-            this.trees.push({ 
-                trunk, 
-                canopy, 
-                x, 
-                z, 
-                size: treeSize,
-                type: 'side_tree'
-            });
-            
-        } catch (error) {
-            console.error("Error creating varied tree:", error);
         }
     }
     
@@ -661,39 +584,39 @@ class CityGenerator {
     }
     
     createLargeTree(x, z) {
-        // Enhanced park trees - make them bigger too
-        const trunkGeometry = new THREE.CylinderGeometry(0.6, 0.8, 10, 8); // Increased size
+        // Tree trunk
+        const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.7, 8, 8);
         const trunkMaterial = new THREE.MeshStandardMaterial({
             color: 0x8B4513,
             roughness: 0.9
         });
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-        trunk.position.set(x, 5, z);
+        trunk.position.set(x, 4, z);
         trunk.castShadow = true;
         this.scene.add(trunk);
         
-        // Tree canopy - bigger
-        const canopyGeometry = new THREE.SphereGeometry(5, 8, 6); // Increased size
+        // Tree canopy
+        const canopyGeometry = new THREE.SphereGeometry(4, 8, 6);
         const canopyMaterial = new THREE.MeshStandardMaterial({
             color: 0x228B22,
             roughness: 0.8
         });
         const canopy = new THREE.Mesh(canopyGeometry, canopyMaterial);
-        canopy.position.set(x, 12, z); // Adjusted height
+        canopy.position.set(x, 10, z);
         canopy.castShadow = true;
         canopy.receiveShadow = true;
         this.scene.add(canopy);
         
         // Add tree physics
-        const treeShape = new CANNON.Cylinder(0.8, 0.8, 10, 8);
+        const treeShape = new CANNON.Cylinder(0.7, 0.7, 8, 8);
         const treeBody = new CANNON.Body({ mass: 0 });
         treeBody.addShape(treeShape);
-        treeBody.position.set(x, 5, z);
+        treeBody.position.set(x, 4, z);
         this.world.addBody(treeBody);
         
-        this.trees.push({ trunk, canopy, x, z, type: 'park_tree' });
+        this.trees.push({ trunk, canopy, x, z });
         
-        console.log(`Large park tree created at (${x}, ${z})`);
+        console.log(`Large tree created at (${x}, ${z})`);
     }
     
     addFlowers(parkX, parkZ) {
@@ -745,47 +668,34 @@ class CityGenerator {
     }
     
     createStreetTree(x, z) {
-        // Enhanced street trees - make them varied
-        const treeVariants = [
-            { trunkR: 0.25, trunkH: 5, canopyR: 2.5, canopyY: 6.5 },
-            { trunkR: 0.3, trunkH: 6, canopyR: 3, canopyY: 8 },
-            { trunkR: 0.2, trunkH: 4, canopyR: 2, canopyY: 5.5 }
-        ];
-        
-        const variant = treeVariants[Math.floor(Math.random() * treeVariants.length)];
-        
-        // Tree trunk
-        const trunkGeometry = new THREE.CylinderGeometry(variant.trunkR * 0.8, variant.trunkR, variant.trunkH, 6);
+        // Smaller street tree
+        const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 4, 6);
         const trunkMaterial = new THREE.MeshStandardMaterial({
             color: 0x8B4513,
             roughness: 0.9
         });
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-        trunk.position.set(x, variant.trunkH / 2, z);
+        trunk.position.set(x, 2, z);
         trunk.castShadow = true;
         this.scene.add(trunk);
         
         // Tree canopy
-        const canopyGeometry = new THREE.SphereGeometry(variant.canopyR, 6, 4);
+        const canopyGeometry = new THREE.SphereGeometry(2, 6, 4);
         const canopyMaterial = new THREE.MeshStandardMaterial({
             color: 0x32CD32,
             roughness: 0.8
         });
         const canopy = new THREE.Mesh(canopyGeometry, canopyMaterial);
-        canopy.position.set(x, variant.canopyY, z);
+        canopy.position.set(x, 5, z);
         canopy.castShadow = true;
         this.scene.add(canopy);
         
-        // Add tree physics for medium/large street trees
-        if (variant.trunkR > 0.25) {
-            const treeShape = new CANNON.Cylinder(variant.trunkR, variant.trunkR, variant.trunkH, 6);
-            const treeBody = new CANNON.Body({ mass: 0 });
-            treeBody.addShape(treeShape);
-            treeBody.position.set(x, variant.trunkH / 2, z);
-            this.world.addBody(treeBody);
-        }
-        
-        this.trees.push({ trunk, canopy, x, z, type: 'street_tree' });
+        // Add tree physics
+        const treeShape = new CANNON.Cylinder(0.3, 0.3, 4, 6);
+        const treeBody = new CANNON.Body({ mass: 0 });
+        treeBody.addShape(treeShape);
+        treeBody.position.set(x, 2, z);
+        this.world.addBody(treeBody);
     }
     
     createCityBoundaries() {
