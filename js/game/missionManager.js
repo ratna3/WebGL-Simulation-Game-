@@ -12,18 +12,10 @@ class MissionManager {
     
     getPlayerName() {
         // Get player name from global function or storage
-        if (typeof window.getAgentName === 'function') {
-            return window.getAgentName();
+        if (typeof getAgentName === 'function') {
+            return getAgentName();
         }
-        
-        // Fallback to localStorage
-        const savedName = localStorage.getItem('agentName');
-        if (savedName) {
-            return savedName;
-        }
-        
-        // Final fallback
-        return "Agent Smith";
+        return localStorage.getItem('agentName') || 'Agent Smith';
     }
     
     startMission(enemyCount) {
@@ -32,48 +24,43 @@ class MissionManager {
         this.missionActive = true;
         this.missionComplete = false;
         
-        console.log(`Mission started: Eliminate ${this.totalEnemies} enemies`);
+        console.log(`Mission started: Eliminate ${enemyCount} REPO operatives`);
         this.updateMissionDisplay();
     }
     
     enemyEliminated() {
-        if (!this.missionActive) {
-            console.log("Enemy eliminated but mission not active");
-            return;
-        }
+        if (!this.missionActive) return;
         
         this.enemiesKilled++;
         console.log(`Enemy eliminated! Progress: ${this.enemiesKilled}/${this.totalEnemies}`);
         
-        // Force update display immediately
         this.updateMissionDisplay();
         
-        // Check for mission completion
         if (this.enemiesKilled >= this.totalEnemies) {
-            console.log("All enemies eliminated - mission complete!");
             this.completeMission();
         }
     }
     
     completeMission() {
-        this.missionActive = false;
+        if (this.missionComplete) return;
+        
         this.missionComplete = true;
+        this.missionActive = false;
         
-        console.log("Mission Complete!");
-        
-        // Show congratulations screen
+        console.log("Mission completed!");
         this.showCongratulations();
+        this.playVictorySound();
     }
     
     showCongratulations() {
-        const congratsOverlay = document.createElement('div');
-        congratsOverlay.style.cssText = `
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.95);
+            background: rgba(0,0,0,0.9);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -81,142 +68,114 @@ class MissionManager {
             font-family: 'Courier New', monospace;
         `;
         
-        congratsOverlay.innerHTML = `
-            <div style="text-align: center; color: white; max-width: 600px;">
-                <h1 style="color: #00ff00; font-size: 48px; margin-bottom: 20px; text-shadow: 0 0 20px #00ff00;">
-                    MISSION ACCOMPLISHED!
+        overlay.innerHTML = `
+            <div style="text-align: center; color: white;">
+                <h1 style="color: #00ff00; font-size: 64px; margin-bottom: 20px; text-shadow: 0 0 20px #00ff00;">
+                    MISSION ACCOMPLISHED
                 </h1>
                 
-                <h2 style="color: #ff3e3e; font-size: 32px; margin-bottom: 30px;">
-                    Congratulations! Detective ${this.playerName}
+                <h2 style="color: #00ff00; font-size: 32px; margin-bottom: 30px;">
+                    Well done, ${this.playerName}!
                 </h2>
                 
-                <div style="background: rgba(0,255,0,0.1); border: 2px solid #00ff00; padding: 20px; border-radius: 10px; margin-bottom: 30px;">
-                    <h3 style="color: #00ff00; margin-bottom: 15px;">MISSION REPORT</h3>
-                    <p style="font-size: 18px; line-height: 1.5;">
-                        Agent <strong>${this.playerName}</strong> has successfully completed the undercover operation.<br><br>
-                        <strong>Enemies Eliminated:</strong> ${this.enemiesKilled}<br>
-                        <strong>Mission Status:</strong> <span style="color: #00ff00;">SUCCESS</span><br>
-                        <strong>Cover Status:</strong> Maintained<br><br>
-                        The criminal organization has been neutralized.<br>
-                        The city is now safe thanks to your efforts, ${this.playerName}.
-                    </p>
-                </div>
+                <p style="font-size: 18px; margin-bottom: 30px; color: #ccc;">
+                    You have successfully infiltrated and neutralized the REPO criminal organization.<br>
+                    All hostile operatives have been eliminated.<br><br>
+                    Enemies Eliminated: ${this.enemiesKilled}/${this.totalEnemies}
+                </p>
                 
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #ffff00; margin-bottom: 10px;">ACHIEVEMENT UNLOCKED</h3>
-                    <p style="color: #ffff00;">🏆 Master Detective - Complete the undercover mission as ${this.playerName}</p>
-                </div>
-                
-                <button onclick="this.restartMission()" 
-                        style="background: #ff3e3e; color: white; border: none; padding: 15px 30px; 
+                <button onclick="window.location.reload()" 
+                        style="background: #00ff00; color: black; border: none; padding: 15px 30px; 
                                font-size: 18px; border-radius: 5px; cursor: pointer; margin-right: 15px;">
                     NEW MISSION
                 </button>
                 
-                <button onclick="this.exitGame()" 
+                <button onclick="this.parentElement.parentElement.remove()" 
                         style="background: #666; color: white; border: none; padding: 15px 30px; 
                                font-size: 18px; border-radius: 5px; cursor: pointer;">
-                    EXIT
+                    CONTINUE
                 </button>
             </div>
         `;
         
-        // Add button functionality
-        congratsOverlay.querySelector('button').onclick = () => {
-            // Restart mission
-            document.body.removeChild(congratsOverlay);
-            if (window.game) {
-                window.game.restartMission();
-            }
-        };
-        
-        congratsOverlay.querySelectorAll('button')[1].onclick = () => {
-            // Exit game - go back to agent naming
-            window.location.reload();
-        };
-        
-        document.body.appendChild(congratsOverlay);
-        
-        // Play victory sound (if available)
-        this.playVictorySound();
+        document.body.appendChild(overlay);
     }
     
     playVictorySound() {
-        // Create a simple victory beep using Web Audio API
         try {
+            // Create victory sound using Web Audio API
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
             
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            // Play a victory melody
+            const frequencies = [523, 659, 784, 1047]; // C, E, G, C (major chord)
+            let delay = 0;
             
-            oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime); // E note
-            oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime + 0.1); // C note
-            oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G note
-            
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.5);
+            frequencies.forEach((freq, index) => {
+                setTimeout(() => {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                }, delay);
+                
+                delay += 150;
+            });
         } catch (error) {
-            console.log("Could not play victory sound:", error);
+            console.log("Audio not available for victory sound");
         }
     }
     
     updateMissionDisplay() {
-        // Update HUD mission progress
-        let missionElement = document.getElementById('mission-progress');
-        
+        let missionElement = document.querySelector('.mission-progress');
         if (!missionElement) {
-            // Create mission progress display
+            // Create mission display if it doesn't exist
             missionElement = document.createElement('div');
-            missionElement.id = 'mission-progress';
+            missionElement.className = 'mission-progress';
             missionElement.style.cssText = `
                 position: fixed;
                 top: 20px;
                 left: 20px;
-                background: rgba(0,0,0,0.8);
                 color: white;
+                font-size: 16px;
+                font-weight: bold;
+                text-shadow: 2px 2px 4px #000;
+                font-family: 'Courier New', monospace;
+                background: rgba(0, 0, 0, 0.7);
                 padding: 15px;
                 border-radius: 5px;
-                font-family: 'Courier New', monospace;
-                border: 1px solid #ff3e3e;
-                z-index: 50;
+                border: 1px solid rgba(255, 62, 62, 0.3);
+                z-index: 100;
             `;
             document.body.appendChild(missionElement);
         }
         
         if (this.missionActive) {
-            const progressPercent = this.totalEnemies > 0 ? (this.enemiesKilled / this.totalEnemies) * 100 : 0;
             missionElement.innerHTML = `
-                <h4 style="color: #ff3e3e; margin-bottom: 10px;">MISSION PROGRESS</h4>
-                <p>Agent: ${this.playerName}</p>
-                <p>Enemies Eliminated: <span style="color: #00ff00;">${this.enemiesKilled}</span>/<span style="color: #ff3e3e;">${this.totalEnemies}</span></p>
-                <div style="width: 200px; height: 10px; background: #333; border-radius: 5px; margin-top: 10px;">
-                    <div style="width: ${progressPercent}%; height: 100%; background: #ff3e3e; border-radius: 5px; transition: width 0.3s ease;"></div>
+                <div style="color: #ff3e3e; margin-bottom: 5px;">OPERATION STATUS</div>
+                <div>Agent: ${this.playerName}</div>
+                <div>Targets Eliminated: ${this.enemiesKilled}/${this.totalEnemies}</div>
+                <div style="margin-top: 5px; color: ${this.enemiesKilled === this.totalEnemies ? '#00ff00' : '#ffff00'};">
+                    ${this.enemiesKilled === this.totalEnemies ? 'MISSION COMPLETE' : 'IN PROGRESS'}
                 </div>
             `;
-        } else if (this.missionComplete) {
-            missionElement.innerHTML = `
-                <h4 style="color: #00ff00;">MISSION COMPLETE!</h4>
-                <p>Agent: ${this.playerName}</p>
-                <p style="color: #00ff00;">All enemies eliminated!</p>
-            `;
+        } else {
+            missionElement.textContent = `Agent ${this.playerName} - Awaiting Orders`;
         }
-        
-        console.log(`Mission display updated: ${this.enemiesKilled}/${this.totalEnemies}`);
     }
     
     getMissionStatus() {
         return {
             active: this.missionActive,
             complete: this.missionComplete,
-            progress: this.enemiesKilled / this.totalEnemies,
-            enemiesKilled: this.enemiesKilled,
-            totalEnemies: this.totalEnemies,
+            progress: `${this.enemiesKilled}/${this.totalEnemies}`,
             playerName: this.playerName
         };
     }
@@ -224,3 +183,4 @@ class MissionManager {
 
 // Make MissionManager globally available
 window.MissionManager = MissionManager;
+console.log("MissionManager.js loaded successfully");

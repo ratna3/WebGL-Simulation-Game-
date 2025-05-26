@@ -19,11 +19,11 @@ class Player {
         this.sprintSpeed = 80;    // Sprint speed
         this.jumpForce = 20;      // Stronger jump
         
-        // Physics properties
+        // Physics properties - adjusted for bigger characters in the world
         this.body = null;
-        this.height = 1.8;
-        this.radius = 0.4;
-        this.eyeHeight = 1.7;
+        this.height = 2.5; // Increased height to match bigger characters
+        this.radius = 0.6; // Increased radius
+        this.eyeHeight = 2.3; // Higher eye height
         
         // Movement flags - simplified and more reliable
         this.keys = {
@@ -77,7 +77,11 @@ class Player {
     setupWeapon() {
         try {
             this.weapon = new Weapon(this.scene, this.camera, this.world);
-            console.log("Player weapon initialized");
+            console.log("Player weapon initialized successfully");
+            
+            // Make weapon accessible for debugging
+            window.playerWeapon = this.weapon;
+            
         } catch (error) {
             console.error("Error setting up weapon:", error);
         }
@@ -85,7 +89,7 @@ class Player {
     
     setupPhysics() {
         try {
-            // Create physics body
+            // Create physics body - bigger to match character scale
             const shape = new CANNON.Sphere(this.radius);
             
             this.body = new CANNON.Body({
@@ -101,13 +105,13 @@ class Player {
             // Add shape to body
             this.body.addShape(shape);
             
-            // Position body above ground
-            this.body.position.set(0, this.height / 2 + 2, 0);
+            // Position body above ground - higher for bigger character
+            this.body.position.set(0, this.height / 2 + 3, 0);
             
             // Add to physics world
             this.world.addBody(this.body);
             
-            console.log("Player physics initialized");
+            console.log("Player physics initialized with bigger dimensions");
         } catch (error) {
             console.error("Error setting up player physics:", error);
         }
@@ -120,48 +124,100 @@ class Player {
                 console.log("Creating PointerLockControls");
                 this.controls = new THREE.PointerLockControls(this.camera, document.body);
                 
-                // Add controls to scene so they work properly
-                this.scene.add(this.controls.getObject());
+                // Set up event listeners for controls
+                this.controls.addEventListener('lock', () => {
+                    console.log("Controls locked");
+                    this.controlsLocked = true;
+                });
                 
-                // Set up pointer lock event handlers
-                this.setupPointerLockEvents();
+                this.controls.addEventListener('unlock', () => {
+                    console.log("Controls unlocked");
+                    this.controlsLocked = false;
+                });
+                
+                // Connect the controls
+                this.controls.connect();
+                
+                // Set up safer pointer lock event handlers
+                this.setupSaferPointerLockEvents();
                 
             } else {
                 console.warn("THREE.PointerLockControls not available - using fallback");
-                // Create a fallback object that won't break the game
-                this.controls = {
-                    lock: () => console.log("Pointer lock not available"),
-                    unlock: () => console.log("Pointer lock not available"),
-                    isLocked: false
-                };
+                this.createFallbackControls();
             }
         } catch (error) {
             console.error("Error setting up controls:", error);
-            // Create fallback controls
-            this.controls = {
-                lock: () => console.log("Controls unavailable"),
-                unlock: () => console.log("Controls unavailable"),
-                isLocked: false
-            };
+            this.createFallbackControls();
         }
     }
     
-    setupPointerLockEvents() {
-        // Handle pointer lock changes
-        const onPointerLockChange = () => {
+    createFallbackControls() {
+        // Create a fallback object that won't break the game
+        this.controls = {
+            lock: () => {
+                console.log("Fallback controls - attempting pointer lock");
+                this.requestSafePointerLock();
+            },
+            unlock: () => {
+                if (document.exitPointerLock) {
+                    document.exitPointerLock();
+                }
+            },
+            isLocked: false,
+            connect: () => {},
+            disconnect: () => {},
+            dispose: () => {}
+        };
+        
+        // Set up basic mouse look
+        this.setupFallbackMouseLook();
+    }
+    
+    setupFallbackMouseLook() {
+        let mouseX = 0;
+        let mouseY = 0;
+        const sensitivity = 0.002;
+        
+        const onMouseMove = (event) => {
             if (document.pointerLockElement === document.body) {
-                this.controls.isLocked = true;
-                console.log("Pointer lock acquired");
-            } else {
-                this.controls.isLocked = false;
-                console.log("Pointer lock released");
+                const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
+                const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
+                
+                mouseX -= movementX * sensitivity;
+                mouseY -= movementY * sensitivity;
+                mouseY = Math.max(-Math.PI/2, Math.min(Math.PI/2, mouseY));
+                
+                // Apply rotation to camera
+                this.camera.rotation.order = 'YXZ';
+                this.camera.rotation.y = mouseX;
+                this.camera.rotation.x = mouseY;
+            }
+        };
+        
+        document.addEventListener('mousemove', onMouseMove);
+    }
+    
+    setupSaferPointerLockEvents() {
+        // Handle pointer lock changes more safely
+        const onPointerLockChange = () => {
+            if (this.controls) {
+                const isLocked = document.pointerLockElement === document.body;
+                this.controls.isLocked = isLocked;
+                
+                if (isLocked) {
+                    console.log("Pointer lock acquired successfully");
+                } else {
+                    console.log("Pointer lock released");
+                }
             }
         };
         
         const onPointerLockError = (event) => {
-            console.error("Pointer lock error:", event);
+            // Don't log this as an error since it's expected on page load
+            console.log("Pointer lock not available (waiting for user interaction)");
         };
         
+        // Add event listeners with proper cleanup
         document.addEventListener('pointerlockchange', onPointerLockChange);
         document.addEventListener('pointerlockerror', onPointerLockError);
         
@@ -170,23 +226,72 @@ class Player {
         document.addEventListener('webkitpointerlockchange', onPointerLockChange);
         document.addEventListener('mozpointerlockerror', onPointerLockError);
         document.addEventListener('webkitpointerlockerror', onPointerLockError);
+        
+        // Store cleanup function
+        this.cleanupPointerLockEvents = () => {
+            document.removeEventListener('pointerlockchange', onPointerLockChange);
+            document.removeEventListener('pointerlockerror', onPointerLockError);
+            document.removeEventListener('mozpointerlockchange', onPointerLockChange);
+            document.removeEventListener('webkitpointerlockchange', onPointerLockChange);
+            document.removeEventListener('mozpointerlockerror', onPointerLockError);
+            document.removeEventListener('webkitpointerlockerror', onPointerLockError);
+        };
+    }
+    
+    requestSafePointerLock() {
+        // Only request pointer lock if user has interacted with the page
+        if (!this.hasUserInteracted) {
+            console.log("Waiting for user interaction before requesting pointer lock");
+            return false;
+        }
+        
+        try {
+            if (document.body.requestPointerLock) {
+                document.body.requestPointerLock();
+                return true;
+            }
+        } catch (error) {
+            console.log("Pointer lock request failed (this is normal):", error.message);
+        }
+        return false;
     }
     
     setupInputHandlers() {
         console.log("Setting up player input handlers");
         
-        // Handle pointer lock request safely
+        // Track user interaction
+        this.hasUserInteracted = false;
+        
+        // Mark user interaction on any click or key press
+        const markInteraction = () => {
+            this.hasUserInteracted = true;
+        };
+        
+        document.addEventListener('click', markInteraction, { once: true });
+        document.addEventListener('keydown', markInteraction, { once: true });
+        
+        // Handle pointer lock request more safely
         document.addEventListener('click', (event) => {
-            // Only request pointer lock if not already locked and game is active
-            if (!this.dialogueLocked && this.controls && document.pointerLockElement !== document.body) {
-                // Add a small delay to avoid security errors
+            // Only request pointer lock if:
+            // 1. Not already locked
+            // 2. Not in dialogue
+            // 3. User has interacted
+            // 4. Game is active
+            if (!this.dialogueLocked && 
+                document.pointerLockElement !== document.body && 
+                this.hasUserInteracted &&
+                window.game && window.game.isGameActive) {
+                
+                // Small delay to ensure click event is processed
                 setTimeout(() => {
                     if (this.controls && typeof this.controls.lock === 'function') {
                         try {
                             this.controls.lock();
                         } catch (error) {
-                            console.warn("Could not acquire pointer lock:", error);
+                            console.log("Pointer lock request failed:", error.message);
                         }
+                    } else {
+                        this.requestSafePointerLock();
                     }
                 }, 100);
             }
@@ -197,6 +302,9 @@ class Player {
         // Handle key down events
         document.addEventListener('keydown', (event) => {
             if (!this.alive) return;
+            
+            // Mark interaction
+            this.hasUserInteracted = true;
             
             // Don't process movement if dialogue is active (except weapon controls)
             if (this.dialogueLocked && !['KeyE', 'Tab', 'KeyR'].includes(event.code)) {
@@ -240,25 +348,40 @@ class Player {
                     break;
                 // Weapon controls work even during dialogue for emergency situations
                 case 'Tab':
-                    // Weapon toggle handled by weapon class
+                    // Log weapon toggle attempt
+                    console.log("Tab pressed - weapon toggle");
                     event.preventDefault();
                     break;
                 case 'KeyR':
-                    // Reload handled by weapon class
+                    // Log reload attempt
+                    console.log("R pressed - weapon reload");
+                    event.preventDefault();
+                    break;
+                case 'Escape':
+                    // Allow escape to exit pointer lock
+                    if (document.exitPointerLock) {
+                        document.exitPointerLock();
+                    }
                     event.preventDefault();
                     break;
             }
             
             if (this.debug && event.code === 'KeyP') {
-                // Debug key
+                // Debug key - enhanced info
+                console.log("=== PLAYER DEBUG INFO ===");
                 console.log("Player position:", this.body.position);
                 console.log("Player velocity:", this.body.velocity);
                 console.log("Movement states:", this.keys);
                 console.log("On ground:", this.onGround);
+                console.log("Dialogue locked:", this.dialogueLocked);
+                console.log("User interacted:", this.hasUserInteracted);
+                console.log("Pointer locked:", document.pointerLockElement === document.body);
+                console.log("Controls available:", !!this.controls);
                 if (this.weapon) {
                     console.log("Weapon equipped:", this.weapon.isEquipped);
-                    console.log("Weapon ammo:", this.weapon.ammo);
+                    console.log("Weapon ammo:", this.weapon.ammo + "/" + this.weapon.maxAmmo);
                 }
+                console.log("========================");
             }
         });
         
@@ -294,22 +417,10 @@ class Player {
             }
         });
         
-        // Handle pointer lock for camera control
-        document.addEventListener('click', () => {
-            if (document.pointerLockElement !== document.body && this.controls && !this.dialogueLocked) {
-                this.controls.lock();
-            }
-        });
-        
-        // Listen for pointer lock changes
-        document.addEventListener('pointerlockchange', () => {
-            console.log("Pointer lock state changed:", document.pointerLockElement === document.body ? "locked" : "unlocked");
-        });
-        
-        console.log("Input handlers initialized");
+        console.log("Input handlers initialized with safer pointer lock");
         console.log("Controls: W/A/S/D to move, Space to jump, Shift to sprint, E to interact");
         console.log("Weapon Controls: Tab to equip/holster, Left Click to shoot, R to reload");
-        console.log("Click anywhere to enable mouse look");
+        console.log("Click anywhere to enable mouse look (after interacting with the page)");
     }
     
     handleInteraction() {
@@ -445,13 +556,13 @@ class Player {
     }
     
     checkGround() {
-        // Cast a ray downward to detect ground
+        // Cast a ray downward to detect ground - adjusted for bigger character
         const start = this.body.position.clone();
-        const end = new CANNON.Vec3(start.x, start.y - (this.radius + 0.3), start.z);
+        const end = new CANNON.Vec3(start.x, start.y - (this.radius + 0.4), start.z);
         
         // Simple ground check based on velocity and position
         const wasOnGround = this.onGround;
-        this.onGround = this.body.position.y <= (this.radius + 0.1) && Math.abs(this.body.velocity.y) < 1;
+        this.onGround = this.body.position.y <= (this.radius + 0.15) && Math.abs(this.body.velocity.y) < 1;
         
         if (!wasOnGround && this.onGround) {
             console.log("Landed on ground");
@@ -461,7 +572,7 @@ class Player {
     updateCamera() {
         if (!this.camera || !this.body) return;
         
-        // Position camera at eye height
+        // Position camera at eye height - adjusted for bigger character
         const pos = this.body.position;
         this.camera.position.set(pos.x, pos.y + this.eyeHeight - this.radius, pos.z);
     }
@@ -469,10 +580,25 @@ class Player {
     resetPosition() {
         if (!this.body) return;
         
-        // Reset player if they fall out of the world
-        this.body.position.set(0, 5, 0);
+        // Reset player if they fall out of the world - higher position
+        this.body.position.set(0, 7, 0); // Higher reset position
         this.body.velocity.set(0, 0, 0);
-        console.log("Player position reset");
+        console.log("Player position reset to accommodate bigger character size");
+    }
+    
+    // Add cleanup method
+    dispose() {
+        if (this.cleanupPointerLockEvents) {
+            this.cleanupPointerLockEvents();
+        }
+        
+        if (this.controls && this.controls.dispose) {
+            this.controls.dispose();
+        }
+        
+        if (this.body && this.world) {
+            this.world.removeBody(this.body);
+        }
     }
 }
 

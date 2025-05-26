@@ -2,20 +2,16 @@ class CityGenerator {
     constructor(scene, world) {
         this.scene = scene;
         this.world = world;
-        this.citySize = 400;
+        this.buildingSystem = new BuildingSystem(scene, world);
+        this.citySize = 200;
         this.blockSize = 40;
-        this.roadWidth = 8;
-        this.buildings = [];
-        this.parks = [];
-        this.roads = [];
-        this.trees = [];
         
-        // Initialize texture system with better error handling
-        this.initializeTextureSystem();
+        // Store park locations for enemy spawning
+        this.parkLocations = [];
+        this.treeLocations = [];
+        this.parkEntrances = []; // Store park entrance locations
         
-        // Grid system
-        this.gridSize = Math.floor(this.citySize / this.blockSize);
-        this.cityGrid = this.createCityGrid();
+        console.log("CityGenerator initialized with building system");
     }
     
     initializeTextureSystem() {
@@ -511,61 +507,93 @@ class CityGenerator {
     }
     
     createParkBlock(x, z) {
-        // Create grass ground for park
-        const grassGeometry = new THREE.PlaneGeometry(this.blockSize, this.blockSize);
-        const grassMaterial = new THREE.MeshStandardMaterial({
-            color: 0x2D5016,
-            roughness: 0.9
+        const parkX = x * this.blockSize;
+        const parkZ = z * this.blockSize;
+        
+        // Store park location
+        this.parkLocations.push({ x: parkX, z: parkZ });
+        
+        // Create park ground
+        const parkGeometry = new THREE.PlaneGeometry(this.blockSize - 2, this.blockSize - 2);
+        const parkMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x2d5016,
+            roughness: 0.8 
         });
+        const parkGround = new THREE.Mesh(parkGeometry, parkMaterial);
+        parkGround.rotation.x = -Math.PI / 2;
+        parkGround.position.set(parkX, 0.01, parkZ);
+        parkGround.receiveShadow = true;
+        this.scene.add(parkGround);
         
-        const grass = new THREE.Mesh(grassGeometry, grassMaterial);
-        grass.rotation.x = -Math.PI / 2;
-        grass.position.set(x, 0.02, z);
-        grass.receiveShadow = true;
-        this.scene.add(grass);
+        // Create park fence with entrances
+        this.createParkFenceWithEntrances(parkX, parkZ);
         
-        // Add park fence
-        this.createParkFence(x, z);
+        // Add park vegetation
+        this.addParkVegetation(parkX, parkZ);
         
-        // Add trees and flowers
-        this.addParkVegetation(x, z);
-        
-        this.parks.push({ x, z, grass });
+        console.log(`Created park at (${parkX}, ${parkZ}) with entrances`);
     }
     
-    createParkFence(x, z) {
+    createParkFenceWithEntrances(x, z) {
         const fenceHeight = 1.5;
-        const fenceThickness = 0.1;
-        const fenceColor = 0x8B4513; // Brown
+        const fenceWidth = 0.2;
+        const parkSize = this.blockSize - 2;
+        const entranceWidth = 4; // Width of each entrance
         
-        const fenceMaterial = new THREE.MeshStandardMaterial({
-            color: fenceColor,
-            roughness: 0.8
-        });
-        
-        // Create fence around park perimeter
-        const halfBlock = this.blockSize / 2;
+        // Create fence segments with gaps for entrances
         const fencePositions = [
-            { x: x - halfBlock, z: z, width: fenceThickness, depth: this.blockSize },
-            { x: x + halfBlock, z: z, width: fenceThickness, depth: this.blockSize },
-            { x: x, z: z - halfBlock, width: this.blockSize, depth: fenceThickness },
-            { x: x, z: z + halfBlock, width: this.blockSize, depth: fenceThickness }
+            // North side (with entrance in middle)
+            { x: x - parkSize/2 + 3, z: z + parkSize/2, width: 6, height: fenceHeight, depth: fenceWidth },
+            { x: x + parkSize/2 - 3, z: z + parkSize/2, width: 6, height: fenceHeight, depth: fenceWidth },
+            
+            // South side (with entrance in middle)
+            { x: x - parkSize/2 + 3, z: z - parkSize/2, width: 6, height: fenceHeight, depth: fenceWidth },
+            { x: x + parkSize/2 - 3, z: z - parkSize/2, width: 6, height: fenceHeight, depth: fenceWidth },
+            
+            // East side (with entrance in middle)
+            { x: x + parkSize/2, z: z - parkSize/2 + 3, width: fenceWidth, height: fenceHeight, depth: 6 },
+            { x: x + parkSize/2, z: z + parkSize/2 - 3, width: fenceWidth, height: fenceHeight, depth: 6 },
+            
+            // West side (with entrance in middle)
+            { x: x - parkSize/2, z: z - parkSize/2 + 3, width: fenceWidth, height: fenceHeight, depth: 6 },
+            { x: x - parkSize/2, z: z + parkSize/2 - 3, width: fenceWidth, height: fenceHeight, depth: 6 }
         ];
         
+        // Store entrance locations for enemy pathfinding
+        const entrances = [
+            { x: x, z: z + parkSize/2, direction: 'north' }, // North entrance
+            { x: x, z: z - parkSize/2, direction: 'south' }, // South entrance
+            { x: x + parkSize/2, z: z, direction: 'east' },  // East entrance
+            { x: x - parkSize/2, z: z, direction: 'west' }   // West entrance
+        ];
+        
+        // Add entrances to global list
+        entrances.forEach(entrance => {
+            entrance.parkCenter = { x: x, z: z };
+            this.parkEntrances.push(entrance);
+        });
+        
+        // Create fence segments
         fencePositions.forEach(pos => {
-            const fenceGeometry = new THREE.BoxGeometry(pos.width, fenceHeight, pos.depth);
+            const fenceGeometry = new THREE.BoxGeometry(pos.width, pos.height, pos.depth);
+            const fenceMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4a4a4a,
+                roughness: 0.7 
+            });
             const fence = new THREE.Mesh(fenceGeometry, fenceMaterial);
-            fence.position.set(pos.x, fenceHeight / 2, pos.z);
+            fence.position.set(pos.x, pos.height / 2, pos.z);
             fence.castShadow = true;
             this.scene.add(fence);
             
-            // Add fence physics
-            const fenceShape = new CANNON.Box(new CANNON.Vec3(pos.width/2, fenceHeight/2, pos.depth/2));
+            // Create physics body for fence collision
+            const fenceShape = new CANNON.Box(new CANNON.Vec3(pos.width/2, pos.height/2, pos.depth/2));
             const fenceBody = new CANNON.Body({ mass: 0 });
             fenceBody.addShape(fenceShape);
-            fenceBody.position.set(pos.x, fenceHeight/2, pos.z);
+            fenceBody.position.set(pos.x, pos.height / 2, pos.z);
             this.world.addBody(fenceBody);
         });
+        
+        console.log(`Created park fence with ${entrances.length} entrances at (${x}, ${z})`);
     }
     
     addParkVegetation(parkX, parkZ) {
@@ -747,7 +775,83 @@ class CityGenerator {
         // Return tree locations in parks for enemy hiding spots
         return this.trees.map(tree => ({ x: tree.x, z: tree.z }));
     }
+    
+    // Method to get park entrance locations (for enemy AI)
+    getParkEntrances() {
+        return this.parkEntrances;
+    }
+    
+    // Method to find nearest park entrance to a position
+    findNearestParkEntrance(position) {
+        let nearest = null;
+        let minDistance = Infinity;
+        
+        this.parkEntrances.forEach(entrance => {
+            const distance = Math.sqrt(
+                Math.pow(entrance.x - position.x, 2) + 
+                Math.pow(entrance.z - position.z, 2)
+            );
+            
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearest = entrance;
+            }
+        });
+        
+        return { entrance: nearest, distance: minDistance };
+    }
+    
+    // Method to check if a position is near a park entrance
+    isNearParkEntrance(position, maxDistance = 5) {
+        const result = this.findNearestParkEntrance(position);
+        return result.distance <= maxDistance;
+    }
+    
+    generateCity() {
+        console.log("Generating city layout...");
+        
+        // Create city blocks with buildings
+        for (let x = -this.citySize; x < this.citySize; x += this.blockSize) {
+            for (let z = -this.citySize; z < this.citySize; z += this.blockSize) {
+                // Skip center area for player spawn
+                if (Math.abs(x) < 30 && Math.abs(z) < 30) continue;
+                
+                // Random chance to place a building
+                if (Math.random() > 0.3) {
+                    const buildingX = x + (Math.random() - 0.5) * 10;
+                    const buildingZ = z + (Math.random() - 0.5) * 10;
+                    
+                    if (Math.random() > 0.7) {
+                        this.buildingSystem.createCommercialBuilding(buildingX, buildingZ);
+                    } else {
+                        this.buildingSystem.createResidentialBuilding(buildingX, buildingZ);
+                    }
+                }
+            }
+        }
+        
+        console.log("City generation complete");
+    }
+    
+    getCitySpawnPoints() {
+        const spawnPoints = [];
+        const minDistance = 25;
+        
+        for (let i = 0; i < 20; i++) {
+            const angle = (i / 20) * Math.PI * 2;
+            const distance = minDistance + Math.random() * 50;
+            
+            spawnPoints.push({
+                x: Math.cos(angle) * distance,
+                y: 1,
+                z: Math.sin(angle) * distance
+            });
+        }
+        
+        return spawnPoints;
+    }
 }
 
 // Make CityGenerator globally available
 window.CityGenerator = CityGenerator;
+console.log("CityGenerator.js loaded successfully");

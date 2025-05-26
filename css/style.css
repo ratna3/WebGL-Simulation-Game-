@@ -110,9 +110,29 @@ body {
     bottom: 30px;
     right: 30px;
     color: white;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: bold;
-    text-shadow: 1px 1px 2px #000;
+    text-shadow: 2px 2px 4px #000;
+    font-family: 'Courier New', monospace;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px 15px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 62, 62, 0.3);
+}
+
+.ammo-count {
+    color: white;
+    transition: color 0.3s ease;
+}
+
+.ammo-count.low {
+    color: #ff6600;
+    animation: pulse 1s infinite;
+}
+
+.ammo-count.critical {
+    color: #ff0000;
+    animation: pulse 0.5s infinite;
 }
 
 .interaction-prompt {
@@ -132,10 +152,23 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: white;
-    font-size: 24px;
-    text-shadow: 2px 2px 4px #000, -1px -1px 2px #000;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 20px;
+    text-shadow: 
+        2px 2px 4px #000, 
+        -1px -1px 2px #000,
+        0 0 10px rgba(255, 255, 255, 0.3);
     font-weight: bold;
+    font-family: monospace;
+    pointer-events: none;
+    z-index: 50;
+    transition: color 0.2s ease;
+}
+
+/* Hit confirmation crosshair */
+.crosshair.hit {
+    color: #ff3e3e !important;
+    animation: hitMarker 0.3s ease-out;
 }
 
 /* Dialogue System */
@@ -231,5 +264,45 @@ body {
     100% { 
         opacity: 0; 
         background: transparent;
+    }
+}
+
+/* Bullet trail effects */
+@keyframes bulletTrail {
+    0% { 
+        opacity: 1; 
+        transform: scaleX(1);
+    }
+    100% { 
+        opacity: 0; 
+        transform: scaleX(0.1);
+    }
+}
+
+/* Hit marker animation */
+@keyframes hitMarker {
+    0% { 
+        transform: scale(0.5);
+        opacity: 1;
+    }
+    50% { 
+        transform: scale(1.2);
+        opacity: 0.8;
+    }
+    100% { 
+        transform: scale(0.8);
+        opacity: 0;
+    }
+}
+
+/* Damage number floating animation */
+@keyframes floatingDamage {
+    0% {
+        transform: translateY(0px);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-50px);
+        opacity: 0;
     }
 }

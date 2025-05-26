@@ -387,7 +387,7 @@
                 <div class="progress-bar">
                     <div class="progress-value"></div>
                 </div>
-                <p class="loading-text">Loading game assets...</p>
+                <p class="loading-text">Loading game libraries...</p>
                 <button id="start-button" onclick="startGameDirectly()">START GAME</button>
             </div>
         </div>
@@ -424,12 +424,260 @@
         </div>
     </div>
     
-    <!-- Load libraries first -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/PointerLockControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/cannon@0.6.2/build/cannon.min.js"></script>
-    
+    <!-- Load libraries with working CDN fallbacks -->
+    <script>
+        // Library loading with fallbacks
+        let librariesLoaded = {
+            three: false,
+            cannon: false
+        };
+        
+        function checkLibrariesLoaded() {
+            return librariesLoaded.three && librariesLoaded.cannon;
+        }
+        
+        function onLibraryLoaded(lib) {
+            librariesLoaded[lib] = true;
+            console.log(`${lib} library loaded successfully`);
+            
+            if (checkLibrariesLoaded()) {
+                console.log("All core libraries loaded successfully");
+                document.querySelector('.loading-text').textContent = "Loading game scripts...";
+            }
+        }
+        
+        // Create a fallback physics system when CANNON.js fails
+        function createFallbackCannon() {
+            console.log("Creating fallback CANNON.js implementation");
+            
+            window.CANNON = {
+                World: function() {
+                    return {
+                        gravity: { set: function() {} },
+                        solver: { iterations: 0 },
+                        broadphase: null,
+                        allowSleep: true,
+                        addContactMaterial: function() {},
+                        defaultContactMaterial: null,
+                        addBody: function() {},
+                        removeBody: function() {},
+                        step: function() {}
+                    };
+                },
+                Body: function(options) {
+                    return {
+                        mass: options?.mass || 0,
+                        material: options?.material || null,
+                        position: { x: 0, y: 0, z: 0, set: function(x, y, z) { this.x = x; this.y = y; this.z = z; } },
+                        velocity: { x: 0, y: 0, z: 0, set: function(x, y, z) { this.x = x; this.y = y; this.z = z; } },
+                        angularVelocity: { set: function() {} },
+                        quaternion: { setFromAxisAngle: function() {} },
+                        fixedRotation: false,
+                        allowSleep: false,
+                        addShape: function() {}
+                    };
+                },
+                Sphere: function(radius) { return { radius: radius }; },
+                Cylinder: function(radiusTop, radiusBottom, height, numSegments) {
+                    return { radiusTop, radiusBottom, height, numSegments };
+                },
+                Box: function(halfExtents) { return { halfExtents }; },
+                Plane: function() { return {}; },
+                Material: function(options) { return options || {}; },
+                ContactMaterial: function(mat1, mat2, options) { return { mat1, mat2, ...options }; },
+                NaiveBroadphase: function() { return {}; },
+                Vec3: function(x, y, z) {
+                    return { x: x || 0, y: y || 0, z: z || 0 };
+                }
+            };
+            
+            console.log("Fallback CANNON.js created - physics will be disabled");
+            onLibraryLoaded('cannon');
+        }
+        
+        function loadLibraryWithFallback(libName, urls, globalCheck, callback) {
+            let currentIndex = 0;
+            
+            function tryNextUrl() {
+                if (currentIndex >= urls.length) {
+                    console.warn(`Failed to load ${libName} from all CDNs, using fallback`);
+                    
+                    if (libName === 'cannon') {
+                        createFallbackCannon();
+                    } else {
+                        showError(`Failed to load ${libName} library. Please check your internet connection.`);
+                    }
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = urls[currentIndex];
+                
+                script.onload = function() {
+                    // Wait a moment for script to execute
+                    setTimeout(() => {
+                        if (typeof window[globalCheck] !== 'undefined') {
+                            console.log(`${libName} loaded successfully from: ${urls[currentIndex]}`);
+                            onLibraryLoaded(libName);
+                            if (callback) callback();
+                        } else {
+                            console.warn(`${libName} script loaded but ${globalCheck} not found, trying next URL`);
+                            currentIndex++;
+                            tryNextUrl();
+                        }
+                    }, 100);
+                };
+                
+                script.onerror = function() {
+                    console.warn(`Failed to load ${libName} from: ${urls[currentIndex]}`);
+                    currentIndex++;
+                    tryNextUrl();
+                };
+                
+                document.head.appendChild(script);
+            }
+            
+            // Check if library is already loaded
+            if (typeof window[globalCheck] !== 'undefined') {
+                console.log(`${libName} already loaded`);
+                onLibraryLoaded(libName);
+                if (callback) callback();
+                return;
+            }
+            
+            tryNextUrl();
+        }
+        
+        // Load Three.js with fallbacks
+        loadLibraryWithFallback('three', [
+            'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+            'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+            'https://unpkg.com/three@0.128.0/build/three.min.js'
+        ], 'THREE', function() {
+            setupPointerLockControls();
+        });
+        
+        // Load Cannon.js with working URLs and fallback
+        loadLibraryWithFallback('cannon', [
+            'https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.15.1/cannon.min.js',
+            'https://cdn.jsdelivr.net/npm/cannon@0.15.1/build/cannon.min.js',
+            'https://unpkg.com/cannon@0.15.1/build/cannon.min.js'
+        ], 'CANNON');
+        
+        function setupPointerLockControls() {
+            // PointerLockControls implementation
+            THREE.PointerLockControls = function ( camera, domElement ) {
+                if ( domElement === undefined ) {
+                    console.warn( 'THREE.PointerLockControls: The second parameter "domElement" is now mandatory.' );
+                    domElement = document.body;
+                }
+
+                this.domElement = domElement;
+                this.isLocked = false;
+
+                // Set to constrain the pitch of the camera
+                this.minPolarAngle = 0; // radians
+                this.maxPolarAngle = Math.PI; // radians
+
+                var scope = this;
+
+                var changeEvent = { type: 'change' };
+                var lockEvent = { type: 'lock' };
+                var unlockEvent = { type: 'unlock' };
+
+                var euler = new THREE.Euler( 0, 0, 0, 'YXZ' );
+                var PI_2 = Math.PI / 2;
+
+                var vec = new THREE.Vector3();
+
+                function onMouseMove( event ) {
+                    if ( scope.isLocked === false ) return;
+
+                    var movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
+                    var movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
+
+                    euler.setFromQuaternion( camera.quaternion );
+
+                    euler.y -= movementX * 0.002;
+                    euler.x -= movementY * 0.002;
+
+                    euler.x = Math.max( PI_2 - scope.maxPolarAngle, Math.min( PI_2 - scope.minPolarAngle, euler.x ) );
+
+                    camera.quaternion.setFromEuler( euler );
+
+                    scope.dispatchEvent( changeEvent );
+                }
+
+                function onPointerlockChange() {
+                    if ( scope.domElement.ownerDocument.pointerLockElement === scope.domElement ) {
+                        scope.dispatchEvent( lockEvent );
+                        scope.isLocked = true;
+                    } else {
+                        scope.dispatchEvent( unlockEvent );
+                        scope.isLocked = false;
+                    }
+                }
+
+                function onPointerlockError() {
+                    console.log( 'THREE.PointerLockControls: Pointer Lock API not available or denied' );
+                }
+
+                this.connect = function () {
+                    scope.domElement.ownerDocument.addEventListener( 'mousemove', onMouseMove );
+                    scope.domElement.ownerDocument.addEventListener( 'pointerlockchange', onPointerlockChange );
+                    scope.domElement.ownerDocument.addEventListener( 'pointerlockerror', onPointerlockError );
+                };
+
+                this.disconnect = function () {
+                    scope.domElement.ownerDocument.removeEventListener( 'mousemove', onMouseMove );
+                    scope.domElement.ownerDocument.removeEventListener( 'pointerlockchange', onPointerlockChange );
+                    scope.domElement.ownerDocument.removeEventListener( 'pointerlockerror', onPointerlockError );
+                };
+
+                this.dispose = function () {
+                    this.disconnect();
+                };
+
+                this.getObject = function () { // retaining this method for backward compatibility
+                    return camera;
+                };
+
+                this.getDirection = function () {
+                    var direction = new THREE.Vector3( 0, 0, - 1 );
+                    return function ( v ) {
+                        return v.copy( direction ).applyQuaternion( camera.quaternion );
+                    };
+                }();
+
+                this.moveForward = function ( distance ) {
+                    vec.setFromMatrixColumn( camera.matrix, 0 );
+                    vec.crossVectors( camera.up, vec );
+                    camera.position.addScaledVector( vec, distance );
+                };
+
+                this.moveRight = function ( distance ) {
+                    vec.setFromMatrixColumn( camera.matrix, 0 );
+                    camera.position.addScaledVector( vec, distance );
+                };
+
+                this.lock = function () {
+                    this.domElement.requestPointerLock();
+                };
+
+                this.unlock = function () {
+                    scope.domElement.ownerDocument.exitPointerLock();
+                };
+
+                this.connect();
+            };
+
+            THREE.PointerLockControls.prototype = Object.create( THREE.EventDispatcher.prototype );
+            THREE.PointerLockControls.prototype.constructor = THREE.PointerLockControls;
+            
+            console.log("PointerLockControls setup complete");
+        }
+    </script>
+
     <!-- Utility functions -->
     <script>
         // Debug and error handling utilities
@@ -439,6 +687,13 @@
             if (errorElement) {
                 errorElement.textContent = message;
                 errorElement.style.display = 'block';
+                
+                // Also update loading text
+                const loadingText = document.querySelector('.loading-text');
+                if (loadingText) {
+                    loadingText.textContent = `Error: ${message}`;
+                    loadingText.style.color = '#ff0000';
+                }
             }
         }
         
@@ -472,6 +727,14 @@
             debugLog("Start button clicked");
             
             try {
+                // Verify libraries are loaded
+                if (typeof THREE === 'undefined') {
+                    throw new Error("THREE.js library not loaded");
+                }
+                if (typeof CANNON === 'undefined') {
+                    throw new Error("CANNON.js physics library not loaded");
+                }
+                
                 // Hide loading screen right away for better UX
                 document.getElementById('loading-screen').style.display = 'none';
                 
@@ -496,7 +759,11 @@
                 document.body.mozRequestPointerLock || 
                 document.body.webkitRequestPointerLock;
                 
-            document.body.requestPointerLock();
+            if (document.body.requestPointerLock) {
+                document.body.requestPointerLock();
+            } else {
+                console.log("Pointer lock not supported");
+            }
         }
         
         // Agent naming functionality
@@ -516,19 +783,8 @@
                 
                 console.log(`Agent identity confirmed: ${agentName}`);
                 
-                // Start loading the game scripts
-                if (typeof loadGameScripts === 'function') {
-                    loadGameScripts();
-                } else {
-                    // Fallback - wait a bit for scripts to be available
-                    setTimeout(() => {
-                        if (typeof loadGameScripts === 'function') {
-                            loadGameScripts();
-                        } else {
-                            console.error("loadGameScripts function not available");
-                        }
-                    }, 100);
-                }
+                // Wait for libraries to load, then start loading game scripts
+                waitForLibrariesThenLoadGame();
             } else {
                 // Show error for invalid name
                 nameInput.style.borderColor = '#ff0000';
@@ -544,21 +800,43 @@
             }
         }
         
+        function waitForLibrariesThenLoadGame() {
+            const checkInterval = setInterval(() => {
+                if (checkLibrariesLoaded()) {
+                    clearInterval(checkInterval);
+                    console.log("All libraries loaded, starting game script loading");
+                    loadGameScripts();
+                } else {
+                    console.log("Waiting for libraries to load...", librariesLoaded);
+                }
+            }, 100);
+            
+            // Timeout after 30 seconds
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                if (!checkLibrariesLoaded()) {
+                    showError("Timeout waiting for libraries to load");
+                }
+            }, 30000);
+        }
+        
         // Allow Enter key to confirm name
         document.addEventListener('DOMContentLoaded', () => {
             const nameInput = document.getElementById('agent-name-input');
             const confirmButton = document.getElementById('confirm-name-button');
             
-            nameInput.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter') {
-                    confirmAgentName();
-                }
-            });
-            
-            // Focus on input when page loads
-            setTimeout(() => {
-                nameInput.focus();
-            }, 500);
+            if (nameInput) {
+                nameInput.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') {
+                        confirmAgentName();
+                    }
+                });
+                
+                // Focus on input when page loads
+                setTimeout(() => {
+                    nameInput.focus();
+                }, 500);
+            }
             
             // Add some randomized placeholder suggestions
             const suggestions = [
@@ -569,7 +847,7 @@
             
             let suggestionIndex = 0;
             setInterval(() => {
-                if (document.activeElement !== nameInput) {
+                if (nameInput && document.activeElement !== nameInput) {
                     nameInput.placeholder = suggestions[suggestionIndex];
                     suggestionIndex = (suggestionIndex + 1) % suggestions.length;
                 }
@@ -588,6 +866,19 @@
         
         // Function to load game scripts in sequence
         function loadGameScripts() {
+            // First verify core libraries are available
+            if (typeof THREE === 'undefined') {
+                showError("THREE.js library not available - cannot load game");
+                return;
+            }
+            if (typeof CANNON === 'undefined') {
+                showError("CANNON.js library not available - cannot load game");
+                return;
+            }
+            
+            console.log("Core libraries verified, loading game scripts...");
+            document.querySelector('.loading-text').textContent = "Loading game scripts...";
+            
             const scripts = [
                 'js/utils.js',
                 'js/buildings/buildingTextures.js',
@@ -597,7 +888,7 @@
                 'js/game/missionManager.js',
                 'js/environment.js',
                 'js/dialogue.js',
-                'js/npc.js',                    // Load NPC before weapons and player
+                'js/npc.js',
                 'js/weapons.js',
                 'js/player.js',
                 'js/app.js'
@@ -605,6 +896,14 @@
             
             let loaded = 0;
             const totalScripts = scripts.length;
+            
+            function updateProgress() {
+                const progress = Math.floor((loaded / totalScripts) * 100);
+                const progressBar = document.querySelector('.progress-value');
+                if (progressBar) {
+                    progressBar.style.width = progress + '%';
+                }
+            }
             
             function loadNextScript(index) {
                 if (index >= totalScripts) {
@@ -620,54 +919,38 @@
                         return;
                     }
                     
-                    // Test texture system after all scripts are loaded
+                    // Additional verification for CANNON in the global scope
                     setTimeout(() => {
-                        try {
-                            console.log("Testing BuildingTextures...");
-                            if (typeof BuildingTextures !== 'undefined') {
-                                const textureTest = BuildingTextures.getInstance();
-                                console.log("Texture system test passed:", textureTest.isInitialized);
-                                
-                                // Force initialize if not ready
-                                if (!textureTest.isInitialized) {
-                                    console.log("Force initializing textures...");
-                                    textureTest.createAllTextures();
-                                }
-                            } else {
-                                console.error("BuildingTextures class not available");
-                            }
-                        } catch (error) {
-                            console.error("Texture system test failed:", error);
+                        if (typeof CANNON === 'undefined') {
+                            showError("CANNON physics library lost during script loading");
+                            return;
                         }
+                        
+                        console.log("All systems verified and ready");
+                        document.querySelector('.loading-text').textContent = "Game loaded! Click START to begin your undercover mission.";
+                        document.getElementById('start-button').style.display = "block";
                     }, 200);
                     
-                    document.querySelector('.loading-text').textContent = "Game loaded! Click START to begin your undercover mission.";
-                    document.getElementById('start-button').style.display = "block";
                     return;
                 }
                 
                 const script = document.createElement('script');
-                script.src = scripts[index];
+                script.src = scripts[index] + '?v=' + Date.now(); // Cache busting
                 
                 script.onload = function() {
                     loaded++;
-                    const progress = Math.floor((loaded / totalScripts) * 100);
-                    document.querySelector('.progress-value').style.width = progress + '%';
+                    updateProgress();
                     
                     debugLog(`Loaded ${scripts[index]} (${loaded}/${totalScripts})`);
                     
-                    // Verify specific critical scripts loaded correctly
-                    if (scripts[index].includes('npc.js')) {
-                        setTimeout(() => {
-                            if (typeof NPCManager !== 'undefined') {
-                                console.log("NPCManager class loaded successfully");
-                            } else {
-                                console.error("NPCManager class failed to load from npc.js");
-                            }
-                        }, 50);
+                    // Verify CANNON is still available after each script load
+                    if (typeof CANNON === 'undefined') {
+                        showError(`CANNON library lost after loading ${scripts[index]}`);
+                        return;
                     }
                     
-                    loadNextScript(index + 1);
+                    // Small delay to ensure script fully processes
+                    setTimeout(() => loadNextScript(index + 1), 50);
                 };
                 
                 script.onerror = function() {
@@ -685,15 +968,11 @@
         window.addEventListener('DOMContentLoaded', function() {
             debugLog("DOM loaded, agent naming screen ready");
             
-            // Check if Three.js loaded properly
-            if (typeof THREE === 'undefined') {
-                showError("THREE.js library failed to load");
-                document.querySelector('.loading-text').textContent = "Error: Game engine not available";
-                return;
-            }
-            
             // Initialize debug tools
-            document.getElementById('debug-info').innerHTML = "<h3>Debug Log</h3>";
+            const debugInfo = document.getElementById('debug-info');
+            if (debugInfo) {
+                debugInfo.innerHTML = "<h3>Debug Log</h3>";
+            }
             
             // Don't start loading scripts automatically - wait for agent name confirmation
             debugLog("Waiting for agent name confirmation...");
@@ -713,6 +992,7 @@
             debugButton.style.backgroundColor = '#333';
             debugButton.style.color = 'white';
             debugButton.textContent = 'Restart Controls';
+            debugButton.style.display = 'none'; // Hide until game starts
             
             debugButton.addEventListener('click', () => {
                 if (window.player && window.player.controls) {
@@ -728,6 +1008,11 @@
             });
             
             document.body.appendChild(debugButton);
+            
+            // Show debug button when game starts
+            window.addEventListener('gameStarted', () => {
+                debugButton.style.display = 'block';
+            });
         });
     </script>
 </body>
