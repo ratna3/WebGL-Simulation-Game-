@@ -169,6 +169,153 @@ const Utils = {
             console.error("Error adding clouds:", error);
             return new THREE.Group(); // Return empty group on error
         }
+    },
+    
+    // Collision utilities for NPCs
+    collision: {
+        // Create a compound body for both legs - much larger for bigger NPCs
+        createLegCollisionBody: function(world, position, scale = 1) {
+            try {
+                const legBody = new CANNON.Body({
+                    mass: 0, // Static collision body
+                    type: CANNON.Body.KINEMATIC, // Moves with NPC but provides collision
+                    material: new CANNON.Material({
+                        friction: 0.9, // Higher friction for better ground contact
+                        restitution: 0.0 // No bouncing
+                    })
+                });
+                
+                // Create much wider, lower collision shapes for bigger NPCs
+                const leftLegShape = new CANNON.Cylinder(
+                    0.18 * scale,  // top radius - increased for much bigger NPCs
+                    0.26 * scale, // bottom radius (wider at bottom) - increased
+                    1.8 * scale,  // height - increased for much bigger NPCs
+                    8             // segments
+                );
+                legBody.addShape(leftLegShape, new CANNON.Vec3(-0.4 * scale, -0.35 * scale, 0)); // Adjusted spacing
+                
+                const rightLegShape = new CANNON.Cylinder(
+                    0.18 * scale,
+                    0.26 * scale,
+                    1.8 * scale,
+                    8
+                );
+                legBody.addShape(rightLegShape, new CANNON.Vec3(0.4 * scale, -0.35 * scale, 0)); // Adjusted spacing
+                
+                // Position the leg collision body lower - adjusted for much bigger NPCs
+                legBody.position.set(position.x, position.y - 0.45 * scale, position.z);
+                
+                world.addBody(legBody);
+                return legBody;
+                
+            } catch (error) {
+                console.error("Error creating leg collision body:", error);
+                return null;
+            }
+        },
+        
+        // Create foot collision bodies - much larger for bigger NPCs
+        createFootCollisionBodies: function(world, position, scale = 1) {
+            try {
+                const footBodies = [];
+                
+                // Left foot - much larger for bigger NPCs
+                const leftFootBody = new CANNON.Body({
+                    mass: 0,
+                    type: CANNON.Body.KINEMATIC,
+                    material: new CANNON.Material({
+                        friction: 1.0, // Maximum friction
+                        restitution: 0.0
+                    })
+                });
+                
+                // Use box instead of sphere for better ground contact - much larger
+                const leftFootShape = new CANNON.Box(new CANNON.Vec3(0.26 * scale, 0.08 * scale, 0.35 * scale)); // Increased
+                leftFootBody.addShape(leftFootShape);
+                leftFootBody.position.set(
+                    position.x - 0.4 * scale, // Adjusted spacing for much bigger NPCs
+                    position.y - 1.4 * scale, // Lower position for much bigger NPCs
+                    position.z
+                );
+                
+                // Right foot - much larger
+                const rightFootBody = new CANNON.Body({
+                    mass: 0,
+                    type: CANNON.Body.KINEMATIC,
+                    material: new CANNON.Material({
+                        friction: 1.0,
+                        restitution: 0.0
+                    })
+                });
+                
+                const rightFootShape = new CANNON.Box(new CANNON.Vec3(0.26 * scale, 0.08 * scale, 0.35 * scale)); // Increased
+                rightFootBody.addShape(rightFootShape);
+                rightFootBody.position.set(
+                    position.x + 0.4 * scale, // Adjusted spacing for much bigger NPCs
+                    position.y - 1.4 * scale, // Lower position for much bigger NPCs
+                    position.z
+                );
+                
+                world.addBody(leftFootBody);
+                world.addBody(rightFootBody);
+                
+                footBodies.push(leftFootBody, rightFootBody);
+                return footBodies;
+                
+            } catch (error) {
+                console.error("Error creating foot collision bodies:", error);
+                return [];
+            }
+        },
+        
+        // Update leg collisions to follow main NPC body - adjusted for much bigger NPCs
+        updateLegCollisions: function(mainBody, legBody, footBodies, scale = 1) {
+            try {
+                if (!mainBody || !legBody) return;
+                
+                legBody.position.copy(mainBody.position);
+                legBody.position.y -= 0.45 * scale; // Keep legs lower for much bigger NPCs
+                legBody.quaternion.copy(mainBody.quaternion);
+                
+                // Ensure legs don't float by clamping Y position
+                const groundLevel = 0; // Adjust based on your ground level
+                if (legBody.position.y < groundLevel + 0.18 * scale) { // Adjusted for much bigger NPCs
+                    legBody.position.y = groundLevel + 0.18 * scale;
+                }
+                
+                // Update foot positions with better ground contact - adjusted spacing for much bigger NPCs
+                if (footBodies && footBodies.length >= 2) {
+                    const leftFootOffset = new CANNON.Vec3(-0.4 * scale, -1.4 * scale, 0); // Adjusted
+                    const rightFootOffset = new CANNON.Vec3(0.4 * scale, -1.4 * scale, 0); // Adjusted
+                    
+                    footBodies[0].position.copy(legBody.position).vadd(leftFootOffset);
+                    footBodies[1].position.copy(legBody.position).vadd(rightFootOffset);
+                    
+                    // Update foot rotation to align with ground - prevent flipping
+                    footBodies[0].quaternion.copy(legBody.quaternion);
+                    footBodies[1].quaternion.copy(legBody.quaternion);
+                }
+            } catch (error) {
+                console.error("Error updating leg collisions:", error);
+            }
+        },
+        
+        // Enforce ground contact to prevent NPCs from floating - adjusted for much bigger NPCs
+        enforceGroundContact: function(body, bodyOffset, tolerance = 0.1) {
+            try {
+                const groundLevel = 0;
+                const minHeight = groundLevel + bodyOffset;
+                
+                if (body.position.y < minHeight - tolerance) {
+                    body.position.y = minHeight;
+                    if (body.velocity.y < 0) {
+                        body.velocity.y = 0; // Stop downward movement
+                    }
+                }
+            } catch (error) {
+                console.error("Error enforcing ground contact:", error);
+            }
+        }
     }
 };
 

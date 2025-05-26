@@ -86,13 +86,13 @@ class NPC {
     }
     
     createPhysicsBody() {
-        const shape = new CANNON.Cylinder(0.4, 0.4, 1.6, 12);
+        const shape = new CANNON.Cylinder(0.5, 0.5, 2.0, 12); // Increased from previous values
         this.body = new CANNON.Body({ 
-            mass: 70,
+            mass: 90, // Heavier for much bigger NPCs
             material: new CANNON.Material({ friction: 0.3 })
         });
         this.body.addShape(shape);
-        this.body.position.set(this.position.x, this.position.y + 0.8, this.position.z);
+        this.body.position.set(this.position.x, this.position.y + 1.0, this.position.z); // Adjusted height
         this.body.fixedRotation = true;
         this.world.addBody(this.body);
     }
@@ -101,7 +101,7 @@ class NPC {
         // Update mesh position
         if (this.body) {
             this.group.position.copy(this.body.position);
-            this.group.position.y -= 0.8;
+            this.group.position.y -= 1.0; // Adjusted for bigger NPCs
         }
         
         // Check for player interaction
@@ -293,11 +293,11 @@ class Enemy {
     }
     
     createPhysicsBody() {
-        // Create physics body for collision (cylinder)
-        const shape = new CANNON.Cylinder(0.5, 0.5, 1.8, 12);
+        // Create physics body for collision (cylinder) - much larger for bigger enemies
+        const shape = new CANNON.Cylinder(0.7, 0.7, 2.4, 12); // Increased significantly
         
         this.body = new CANNON.Body({
-            mass: 100, // Heavy enemy
+            mass: 120, // Much heavier enemy
             material: new CANNON.Material({
                 friction: 0.3,
                 restitution: 0.1
@@ -306,12 +306,12 @@ class Enemy {
         });
         
         this.body.addShape(shape);
-        this.body.position.set(this.position.x, this.position.y + 0.9, this.position.z);
+        this.body.position.set(this.position.x, this.position.y + 1.2, this.position.z); // Adjusted height
         
         // Add to physics world
         this.world.addBody(this.body);
         
-        console.log("Enemy physics body created");
+        console.log("Much bigger enemy physics body created");
     }
     
     update(playerPosition, delta) {
@@ -319,7 +319,7 @@ class Enemy {
         
         // Update mesh position to match physics body
         this.group.position.copy(this.body.position);
-        this.group.position.y -= 0.9; // Adjust for center offset
+        this.group.position.y -= 1.2; // Adjusted for much bigger center offset
         
         // Simple AI behavior
         this.updateAI(playerPosition, delta);
