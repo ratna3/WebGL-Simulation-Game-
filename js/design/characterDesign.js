@@ -1,292 +1,654 @@
 class CharacterDesign {
     constructor() {
-        this.materials = {};
-        this.geometries = {};
-        this.initializeMaterials();
-        this.initializeGeometries();
-    }
-    
-    initializeMaterials() {
-        // Character materials
-        this.materials = {
-            // Body materials by type
-            criminal: new THREE.MeshStandardMaterial({ 
-                color: 0x330000, 
-                metalness: 0.3, 
-                roughness: 0.7 
-            }),
-            police: new THREE.MeshStandardMaterial({ 
-                color: 0x000066, 
-                metalness: 0.3, 
-                roughness: 0.7 
-            }),
-            civilian: new THREE.MeshStandardMaterial({ 
-                color: 0x444444, 
-                metalness: 0.3, 
-                roughness: 0.7 
-            }),
-            enemy: new THREE.MeshStandardMaterial({ 
-                color: 0x444444, 
-                metalness: 0.8, 
-                roughness: 0.2 
-            }),
-            
-            // Common materials
-            skin: new THREE.MeshStandardMaterial({ 
-                color: 0xffdbac, 
-                metalness: 0.1, 
-                roughness: 0.9 
-            }),
-            legs: new THREE.MeshStandardMaterial({ 
-                color: 0x222222, 
-                metalness: 0.4, 
-                roughness: 0.6 
-            }),
-            enemyLegs: new THREE.MeshStandardMaterial({ 
-                color: 0x111111, 
-                metalness: 0.6, 
-                roughness: 0.4 
-            }),
-            
-            // Accessory materials
-            badge: new THREE.MeshStandardMaterial({ 
-                color: 0xffd700, 
-                metalness: 0.8, 
-                roughness: 0.2 
-            }),
-            weapon: new THREE.MeshStandardMaterial({
-                color: 0x111111,
-                metalness: 0.9,
-                roughness: 0.1
-            })
+        this.npcScale = 1.8;
+        this.enemyScale = 2.0;
+        
+        this.nameDatabase = {
+            civilian: [
+                "Ahmed Hassan", "Fatima Ali", "Omar Khan", "Zara Malik", "Tariq Shah",
+                "Layla Rahman", "Saeed Ahmad", "Nadia Qureshi", "Faisal Hussain", "Samira Nazir"
+            ],
+            criminal: [
+                "Black Scorpion", "Desert Wolf", "Iron Fist", "Shadow Hawk", "Red Viper",
+                "Storm Rider", "Night Blade", "Fire Snake", "Blood Eagle", "Dark Thunder"
+            ],
+            police: [
+                "Officer Malik", "Sergeant Khan", "Inspector Ahmad", "Captain Hassan", "Lieutenant Shah",
+                "Detective Rahman", "Commander Ali", "Chief Qureshi", "Deputy Hussain", "Constable Nazir"
+            ],
+            enemy: [
+                "Alpha-1", "Bravo-2", "Charlie-3", "Delta-4", "Echo-5",
+                "Foxtrot-6", "Golf-7", "Hotel-8", "India-9", "Juliet-10"
+            ]
         };
+        
+        console.log("CharacterDesign system initialized with detailed features");
     }
     
-    initializeGeometries() {
-        // Character geometries
-        this.geometries = {
-            // Body parts
-            npcBody: new THREE.CylinderGeometry(0.4, 0.4, 1.6, 12),
-            enemyBody: new THREE.CylinderGeometry(0.5, 0.5, 1.8, 12),
-            head: new THREE.CylinderGeometry(0.25, 0.25, 0.4, 12),
-            enemyHead: new THREE.CylinderGeometry(0.3, 0.3, 0.5, 12),
-            eye: new THREE.SphereGeometry(0.05, 8, 8),
-            enemyEye: new THREE.SphereGeometry(0.08, 8, 8),
-            
-            // Legs
-            npcLeg: new THREE.ConeGeometry(0.15, 0.8, 8),
-            enemyLeg: new THREE.ConeGeometry(0.18, 0.9, 8),
-            
-            // Enemy arms
-            arm: new THREE.CylinderGeometry(0.12, 0.12, 1.2, 8),
-            
-            // Accessories
-            badge: new THREE.CylinderGeometry(0.08, 0.08, 0.02, 8),
-            mark: new THREE.CylinderGeometry(0.05, 0.05, 0.2, 6),
-            
-            // Weapons
-            gunBarrel: new THREE.CylinderGeometry(0.03, 0.03, 0.4, 8),
-            gunBody: new THREE.BoxGeometry(0.1, 0.2, 0.3)
-        };
+    generateCharacterName(type) {
+        const names = this.nameDatabase[type] || this.nameDatabase.civilian;
+        return names[Math.floor(Math.random() * names.length)];
     }
     
-    createNPCCharacter(type = 'civilian') {
+    createNPCCharacter(type) {
         const group = new THREE.Group();
+        const scale = this.npcScale;
         
-        // Main body
-        const body = new THREE.Mesh(this.geometries.npcBody, this.materials[type]);
-        body.position.y = 0.8;
-        body.castShadow = true;
-        group.add(body);
+        this.createDetailedHumanoid(group, type, scale);
         
-        // Head
-        const head = new THREE.Mesh(this.geometries.head, this.materials.skin);
-        head.position.y = 1.9;
-        head.castShadow = true;
-        group.add(head);
-        
-        // Eyes
-        this.addNPCEyes(group, type);
-        
-        // Cone legs (upside down)
-        this.addNPCLegs(group);
-        
-        // Type-specific accessories
-        this.addNPCAccessories(group, type);
+        group.scale.setScalar(scale);
         
         return group;
     }
     
-    addNPCEyes(group, type) {
-        let eyeColor = 0x0000ff; // Default blue
-        
-        if (type === 'criminal') {
-            eyeColor = 0xff0000; // Red eyes for criminals
-        } else if (type === 'police') {
-            eyeColor = 0x0099ff; // Bright blue for police
-        }
-        
-        const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: eyeColor,
-            emissive: eyeColor,
-            emissiveIntensity: 0.3
-        });
-        
-        const leftEye = new THREE.Mesh(this.geometries.eye, eyeMaterial);
-        leftEye.position.set(-0.1, 1.95, 0.2);
-        group.add(leftEye);
-        
-        const rightEye = new THREE.Mesh(this.geometries.eye, eyeMaterial);
-        rightEye.position.set(0.1, 1.95, 0.2);
-        group.add(rightEye);
-    }
-    
-    addNPCLegs(group) {
-        // Left leg (upside down cone)
-        const leftLeg = new THREE.Mesh(this.geometries.npcLeg, this.materials.legs);
-        leftLeg.position.set(-0.2, 0.4, 0);
-        leftLeg.rotation.x = Math.PI; // Flip upside down
-        leftLeg.castShadow = true;
-        group.add(leftLeg);
-        
-        // Right leg (upside down cone)
-        const rightLeg = new THREE.Mesh(this.geometries.npcLeg, this.materials.legs);
-        rightLeg.position.set(0.2, 0.4, 0);
-        rightLeg.rotation.x = Math.PI; // Flip upside down
-        rightLeg.castShadow = true;
-        group.add(rightLeg);
-    }
-    
-    addNPCAccessories(group, type) {
-        switch(type) {
-            case 'police':
-                // Police badge
-                const badge = new THREE.Mesh(this.geometries.badge, this.materials.badge);
-                badge.position.set(0.25, 1.2, 0.35);
-                badge.rotation.x = Math.PI / 2;
-                group.add(badge);
-                break;
-                
-            case 'criminal':
-                // Criminal marking
-                const mark = new THREE.Mesh(this.geometries.mark, this.materials.legs);
-                mark.position.set(0.45, 1.0, 0);
-                mark.rotation.z = Math.PI / 2;
-                group.add(mark);
-                break;
-        }
-    }
-    
     createEnemyCharacter() {
         const group = new THREE.Group();
+        const weaponGroup = new THREE.Group();
+        const scale = this.enemyScale;
         
-        // Main body
-        const body = new THREE.Mesh(this.geometries.enemyBody, this.materials.enemy);
-        body.position.y = 0.9;
-        body.castShadow = true;
-        group.add(body);
+        this.createDetailedHumanoid(group, 'enemy', scale);
+        this.createEnemyWeapon(weaponGroup, scale);
         
-        // Head
-        const head = new THREE.Mesh(this.geometries.enemyHead, this.materials.enemy);
-        head.position.y = 2.1;
-        head.castShadow = true;
-        group.add(head);
-        
-        // Glowing red eyes
-        this.addEnemyEyes(group);
-        
-        // Arms
-        this.addEnemyArms(group);
-        
-        // Cone legs (upside down, larger)
-        this.addEnemyLegs(group);
-        
-        // Weapon
-        const weaponGroup = this.createEnemyWeapon();
-        weaponGroup.position.set(0.8, 1.3, 0.2);
-        weaponGroup.rotation.y = Math.PI / 2;
+        weaponGroup.position.set(0.4 * scale, 1.0 * scale, 0);
         group.add(weaponGroup);
+        
+        group.scale.setScalar(scale);
         
         return { group, weaponGroup };
     }
     
-    addEnemyEyes(group) {
-        const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xff0000,
-            emissive: 0xff0000,
-            emissiveIntensity: 0.8
-        });
-        
-        const leftEye = new THREE.Mesh(this.geometries.enemyEye, eyeMaterial);
-        leftEye.position.set(-0.12, 2.15, 0.25);
-        group.add(leftEye);
-        
-        const rightEye = new THREE.Mesh(this.geometries.enemyEye, eyeMaterial);
-        rightEye.position.set(0.12, 2.15, 0.25);
-        group.add(rightEye);
+    createDetailedHumanoid(group, type, scale = 1.0) {
+        try {
+            const colorSchemes = {
+                civilian: {
+                    skin: 0xDDB592,
+                    clothing: 0x4A5568,
+                    pants: 0x2D3748,
+                    shoes: 0x1A202C,
+                    hair: 0x2C1810,
+                    eyes: 0x4A90E2
+                },
+                criminal: {
+                    skin: 0xCD9777,
+                    clothing: 0x2D3748,
+                    pants: 0x1A202C,
+                    shoes: 0x000000,
+                    hair: 0x1A1A1A,
+                    eyes: 0xCC4125
+                },
+                police: {
+                    skin: 0xDDB592,
+                    clothing: 0x2B5CE6,
+                    pants: 0x1A365D,
+                    shoes: 0x000000,
+                    hair: 0x3D2914,
+                    eyes: 0x4A90E2
+                },
+                enemy: {
+                    skin: 0xA0A0A0,
+                    clothing: 0x4A5568,
+                    pants: 0x2D3748,
+                    shoes: 0x1A202C,
+                    hair: 0x2A2A2A,
+                    eyes: 0xFF4444
+                }
+            };
+            
+            const colors = colorSchemes[type] || colorSchemes.civilian;
+            
+            // Create detailed head with facial features
+            const headGroup = this.createDetailedHead(colors, scale);
+            headGroup.position.y = 2.0 * scale;
+            group.add(headGroup);
+            
+            // Create detailed torso
+            const torsoGroup = this.createDetailedTorso(colors, scale);
+            torsoGroup.position.y = 1.1 * scale;
+            group.add(torsoGroup);
+            
+            // Create detailed arms with hands
+            const leftArmGroup = this.createDetailedArm(colors, scale, true);
+            leftArmGroup.position.set(-0.55 * scale, 1.2 * scale, 0);
+            group.add(leftArmGroup);
+            
+            const rightArmGroup = this.createDetailedArm(colors, scale, false);
+            rightArmGroup.position.set(0.55 * scale, 1.2 * scale, 0);
+            group.add(rightArmGroup);
+            
+            // Create detailed legs with feet
+            const leftLegGroup = this.createDetailedLeg(colors, scale, true);
+            leftLegGroup.position.set(-0.25 * scale, 0.35 * scale, 0);
+            group.add(leftLegGroup);
+            
+            const rightLegGroup = this.createDetailedLeg(colors, scale, false);
+            rightLegGroup.position.set(0.25 * scale, 0.35 * scale, 0);
+            group.add(rightLegGroup);
+            
+            // Add character-specific accessories
+            this.addCharacterAccessories(group, type, colors, scale);
+            
+            // Store character data
+            group.userData = {
+                type: type,
+                scale: scale,
+                colors: colors,
+                components: {
+                    head: headGroup,
+                    torso: torsoGroup,
+                    leftArm: leftArmGroup,
+                    rightArm: rightArmGroup,
+                    leftLeg: leftLegGroup,
+                    rightLeg: rightLegGroup
+                }
+            };
+            
+            console.log(`Detailed ${type} character created with facial features and limbs (scale: ${scale})`);
+            
+        } catch (error) {
+            console.error("Error creating detailed humanoid character:", error);
+        }
     }
     
-    addEnemyArms(group) {
+    createDetailedHead(colors, scale) {
+        const headGroup = new THREE.Group();
+        
+        // Main head shape (slightly oval)
+        const headGeometry = new THREE.SphereGeometry(0.26 * scale, 16, 12);
+        headGeometry.scale(1, 1.1, 0.9); // Make it more head-shaped
+        const headMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.skin,
+            roughness: 0.8
+        });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.castShadow = true;
+        headGroup.add(head);
+        
+        // Hair
+        const hairGeometry = new THREE.SphereGeometry(0.27 * scale, 12, 8);
+        hairGeometry.scale(1, 0.8, 1);
+        const hairMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.hair,
+            roughness: 0.9
+        });
+        const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+        hair.position.y = 0.08 * scale;
+        hair.castShadow = true;
+        headGroup.add(hair);
+        
+        // Eyes
+        const eyeGeometry = new THREE.SphereGeometry(0.04 * scale, 8, 8);
+        const eyeMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.eyes,
+            emissive: colors.eyes,
+            emissiveIntensity: 0.2
+        });
+        
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        leftEye.position.set(-0.08 * scale, 0.05 * scale, 0.22 * scale);
+        headGroup.add(leftEye);
+        
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        rightEye.position.set(0.08 * scale, 0.05 * scale, 0.22 * scale);
+        headGroup.add(rightEye);
+        
+        // Pupils
+        const pupilGeometry = new THREE.SphereGeometry(0.02 * scale, 6, 6);
+        const pupilMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+        
+        const leftPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+        leftPupil.position.set(-0.08 * scale, 0.05 * scale, 0.24 * scale);
+        headGroup.add(leftPupil);
+        
+        const rightPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+        rightPupil.position.set(0.08 * scale, 0.05 * scale, 0.24 * scale);
+        headGroup.add(rightPupil);
+        
+        // Nose
+        const noseGeometry = new THREE.ConeGeometry(0.02 * scale, 0.06 * scale, 6);
+        const noseMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.skin,
+            roughness: 0.8
+        });
+        const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+        nose.position.set(0, -0.02 * scale, 0.24 * scale);
+        nose.rotation.x = Math.PI;
+        headGroup.add(nose);
+        
+        // Mouth
+        const mouthGeometry = new THREE.TorusGeometry(0.04 * scale, 0.01 * scale, 8, 16, Math.PI);
+        const mouthMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x8B4513,
+            roughness: 0.6
+        });
+        const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+        mouth.position.set(0, -0.08 * scale, 0.22 * scale);
+        mouth.rotation.x = Math.PI;
+        headGroup.add(mouth);
+        
+        // Ears
+        const earGeometry = new THREE.SphereGeometry(0.03 * scale, 8, 8);
+        earGeometry.scale(0.5, 1, 0.8);
+        const earMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.skin,
+            roughness: 0.8
+        });
+        
+        const leftEar = new THREE.Mesh(earGeometry, earMaterial);
+        leftEar.position.set(-0.25 * scale, 0, 0);
+        headGroup.add(leftEar);
+        
+        const rightEar = new THREE.Mesh(earGeometry, earMaterial);
+        rightEar.position.set(0.25 * scale, 0, 0);
+        headGroup.add(rightEar);
+        
+        return headGroup;
+    }
+    
+    createDetailedTorso(colors, scale) {
+        const torsoGroup = new THREE.Group();
+        
+        // Main torso
+        const torsoGeometry = new THREE.CylinderGeometry(0.35 * scale, 0.4 * scale, 1.4 * scale, 12);
+        const torsoMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.clothing,
+            roughness: 0.7
+        });
+        const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
+        torso.castShadow = true;
+        torsoGroup.add(torso);
+        
+        // Chest details (buttons or patterns)
+        for (let i = 0; i < 4; i++) {
+            const buttonGeometry = new THREE.SphereGeometry(0.02 * scale, 6, 6);
+            const buttonMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x444444,
+                metalness: 0.5
+            });
+            const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+            button.position.set(0, 0.4 * scale - (i * 0.2 * scale), 0.36 * scale);
+            torsoGroup.add(button);
+        }
+        
+        // Collar
+        const collarGeometry = new THREE.TorusGeometry(0.38 * scale, 0.03 * scale, 8, 16, Math.PI);
+        const collarMaterial = new THREE.MeshStandardMaterial({ 
+            color: new THREE.Color(colors.clothing).multiplyScalar(1.2),
+            roughness: 0.6
+        });
+        const collar = new THREE.Mesh(collarGeometry, collarMaterial);
+        collar.position.y = 0.65 * scale;
+        collar.rotation.x = Math.PI;
+        torsoGroup.add(collar);
+        
+        return torsoGroup;
+    }
+    
+    createDetailedArm(colors, scale, isLeft) {
+        const armGroup = new THREE.Group();
+        
+        // Upper arm (shoulder to elbow)
+        const upperArmGeometry = new THREE.CylinderGeometry(0.12 * scale, 0.14 * scale, 0.55 * scale, 12);
         const armMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x555555,
-            metalness: 0.7,
+            color: colors.skin,
+            roughness: 0.8
+        });
+        const upperArm = new THREE.Mesh(upperArmGeometry, armMaterial);
+        upperArm.position.set(0, 0.18 * scale, 0);
+        upperArm.castShadow = true;
+        armGroup.add(upperArm);
+        
+        // Elbow joint
+        const elbowGeometry = new THREE.SphereGeometry(0.09 * scale, 8, 8);
+        const elbow = new THREE.Mesh(elbowGeometry, armMaterial);
+        elbow.position.set(0, -0.09 * scale, 0);
+        armGroup.add(elbow);
+        
+        // Lower arm (elbow to wrist)
+        const lowerArmGeometry = new THREE.CylinderGeometry(0.09 * scale, 0.12 * scale, 0.5 * scale, 12);
+        const lowerArm = new THREE.Mesh(lowerArmGeometry, armMaterial);
+        lowerArm.position.set(0, -0.34 * scale, 0);
+        lowerArm.castShadow = true;
+        armGroup.add(lowerArm);
+        
+        // Wrist
+        const wristGeometry = new THREE.SphereGeometry(0.07 * scale, 8, 8);
+        const wrist = new THREE.Mesh(wristGeometry, armMaterial);
+        wrist.position.set(0, -0.59 * scale, 0);
+        armGroup.add(wrist);
+        
+        // Hand with detailed fingers
+        const handGroup = this.createDetailedHand(colors, scale);
+        handGroup.position.set(0, -0.68 * scale, 0);
+        armGroup.add(handGroup);
+        
+        return armGroup;
+    }
+    
+    createDetailedHand(colors, scale) {
+        const handGroup = new THREE.Group();
+        
+        // Palm
+        const palmGeometry = new THREE.BoxGeometry(0.12 * scale, 0.04 * scale, 0.16 * scale);
+        const handMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.skin,
+            roughness: 0.8
+        });
+        const palm = new THREE.Mesh(palmGeometry, handMaterial);
+        palm.castShadow = true;
+        handGroup.add(palm);
+        
+        // Fingers
+        const fingerPositions = [
+            { x: -0.045 * scale, z: 0.09 * scale }, // Index
+            { x: -0.015 * scale, z: 0.095 * scale }, // Middle
+            { x: 0.015 * scale, z: 0.09 * scale }, // Ring
+            { x: 0.045 * scale, z: 0.08 * scale }, // Pinky
+        ];
+        
+        fingerPositions.forEach((pos, index) => {
+            const fingerLength = index === 3 ? 0.08 * scale : 0.1 * scale; // Pinky is shorter
+            const fingerGeometry = new THREE.CylinderGeometry(0.012 * scale, 0.015 * scale, fingerLength, 6);
+            const finger = new THREE.Mesh(fingerGeometry, handMaterial);
+            finger.position.set(pos.x, fingerLength/2, pos.z);
+            finger.castShadow = true;
+            handGroup.add(finger);
+            
+            // Finger tip
+            const tipGeometry = new THREE.SphereGeometry(0.012 * scale, 6, 6);
+            const tip = new THREE.Mesh(tipGeometry, handMaterial);
+            tip.position.set(pos.x, fingerLength, pos.z);
+            handGroup.add(tip);
+        });
+        
+        // Thumb
+        const thumbGeometry = new THREE.CylinderGeometry(0.015 * scale, 0.018 * scale, 0.08 * scale, 6);
+        const thumb = new THREE.Mesh(thumbGeometry, handMaterial);
+        thumb.position.set(-0.07 * scale, 0.02 * scale, 0.02 * scale);
+        thumb.rotation.z = Math.PI / 4;
+        thumb.castShadow = true;
+        handGroup.add(thumb);
+        
+        return handGroup;
+    }
+    
+    createDetailedLeg(colors, scale, isLeft) {
+        const legGroup = new THREE.Group();
+        
+        // Upper leg (thigh)
+        const upperLegGeometry = new THREE.CylinderGeometry(0.16 * scale, 0.18 * scale, 0.65 * scale, 12);
+        const legMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.pants,
+            roughness: 0.7
+        });
+        const upperLeg = new THREE.Mesh(upperLegGeometry, legMaterial);
+        upperLeg.position.set(0, 0.22 * scale, 0);
+        upperLeg.castShadow = true;
+        legGroup.add(upperLeg);
+        
+        // Knee joint
+        const kneeGeometry = new THREE.SphereGeometry(0.12 * scale, 10, 10);
+        const kneeMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.skin,
+            roughness: 0.8
+        });
+        const knee = new THREE.Mesh(kneeGeometry, kneeMaterial);
+        knee.position.set(0, -0.11 * scale, 0);
+        knee.castShadow = true;
+        legGroup.add(knee);
+        
+        // Lower leg (shin/calf)
+        const lowerLegGeometry = new THREE.CylinderGeometry(0.12 * scale, 0.15 * scale, 0.6 * scale, 12);
+        const lowerLeg = new THREE.Mesh(lowerLegGeometry, legMaterial);
+        lowerLeg.position.set(0, -0.41 * scale, 0);
+        lowerLeg.castShadow = true;
+        legGroup.add(lowerLeg);
+        
+        // Ankle
+        const ankleGeometry = new THREE.SphereGeometry(0.08 * scale, 8, 8);
+        const ankle = new THREE.Mesh(ankleGeometry, kneeMaterial);
+        ankle.position.set(0, -0.71 * scale, 0);
+        ankle.castShadow = true;
+        legGroup.add(ankle);
+        
+        // Detailed foot
+        const footGroup = this.createDetailedFoot(colors, scale);
+        footGroup.position.set(0, -0.78 * scale, 0.08 * scale);
+        legGroup.add(footGroup);
+        
+        return legGroup;
+    }
+    
+    createDetailedFoot(colors, scale) {
+        const footGroup = new THREE.Group();
+        
+        // Main foot body
+        const footGeometry = new THREE.BoxGeometry(0.18 * scale, 0.08 * scale, 0.42 * scale);
+        const footMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.shoes,
+            roughness: 0.9
+        });
+        const foot = new THREE.Mesh(footGeometry, footMaterial);
+        foot.castShadow = true;
+        footGroup.add(foot);
+        
+        // Shoe sole
+        const soleGeometry = new THREE.BoxGeometry(0.2 * scale, 0.03 * scale, 0.44 * scale);
+        const soleMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x111111,
+            roughness: 1.0
+        });
+        const sole = new THREE.Mesh(soleGeometry, soleMaterial);
+        sole.position.y = -0.055 * scale;
+        sole.castShadow = true;
+        footGroup.add(sole);
+        
+        // Shoe laces (decorative)
+        for (let i = 0; i < 3; i++) {
+            const laceGeometry = new THREE.CylinderGeometry(0.005 * scale, 0.005 * scale, 0.15 * scale, 6);
+            const laceMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+            const lace = new THREE.Mesh(laceGeometry, laceMaterial);
+            lace.position.set(0, 0.03 * scale, 0.05 * scale - (i * 0.08 * scale));
+            lace.rotation.z = Math.PI / 2;
+            footGroup.add(lace);
+        }
+        
+        // Toe cap
+        const toeCapGeometry = new THREE.SphereGeometry(0.09 * scale, 8, 8);
+        toeCapGeometry.scale(1, 0.5, 1.5);
+        const toeCap = new THREE.Mesh(toeCapGeometry, footMaterial);
+        toeCap.position.set(0, 0.02 * scale, 0.16 * scale);
+        footGroup.add(toeCap);
+        
+        return footGroup;
+    }
+    
+    addCharacterAccessories(group, type, colors, scale) {
+        switch(type) {
+            case 'police':
+                // Police badge
+                const badgeGeometry = new THREE.CylinderGeometry(0.08 * scale, 0.08 * scale, 0.02 * scale, 8);
+                const badgeMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xffd700,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const badge = new THREE.Mesh(badgeGeometry, badgeMaterial);
+                badge.position.set(0.25 * scale, 1.4 * scale, 0.36 * scale);
+                badge.rotation.x = Math.PI / 2;
+                group.add(badge);
+                
+                // Police cap
+                const capGeometry = new THREE.CylinderGeometry(0.28 * scale, 0.26 * scale, 0.1 * scale, 12);
+                const capMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x1A365D,
+                    roughness: 0.6
+                });
+                const cap = new THREE.Mesh(capGeometry, capMaterial);
+                cap.position.set(0, 2.15 * scale, 0);
+                group.add(cap);
+                break;
+                
+            case 'criminal':
+                // Bandana or hat
+                const bandanaGeometry = new THREE.SphereGeometry(0.27 * scale, 12, 8);
+                bandanaGeometry.scale(1, 0.6, 1);
+                const bandanaMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x8B0000,
+                    roughness: 0.8
+                });
+                const bandana = new THREE.Mesh(bandanaGeometry, bandanaMaterial);
+                bandana.position.set(0, 2.1 * scale, 0);
+                group.add(bandana);
+                
+                // Scar on face
+                const scarGeometry = new THREE.BoxGeometry(0.02 * scale, 0.15 * scale, 0.01 * scale);
+                const scarMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x8B4513,
+                    roughness: 0.9
+                });
+                const scar = new THREE.Mesh(scarGeometry, scarMaterial);
+                scar.position.set(0.1 * scale, 2.05 * scale, 0.24 * scale);
+                group.add(scar);
+                break;
+                
+            case 'civilian':
+                // Glasses (50% chance)
+                if (Math.random() > 0.5) {
+                    const glassGroup = new THREE.Group();
+                    
+                    // Lens frames
+                    const lensGeometry = new THREE.TorusGeometry(0.05 * scale, 0.008 * scale, 8, 16);
+                    const lensMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x444444,
+                        metalness: 0.5
+                    });
+                    
+                    const leftLens = new THREE.Mesh(lensGeometry, lensMaterial);
+                    leftLens.position.set(-0.08 * scale, 0, 0);
+                    glassGroup.add(leftLens);
+                    
+                    const rightLens = new THREE.Mesh(lensGeometry, lensMaterial);
+                    rightLens.position.set(0.08 * scale, 0, 0);
+                    glassGroup.add(rightLens);
+                    
+                    // Bridge
+                    const bridgeGeometry = new THREE.CylinderGeometry(0.005 * scale, 0.005 * scale, 0.04 * scale, 6);
+                    const bridge = new THREE.Mesh(bridgeGeometry, lensMaterial);
+                    bridge.rotation.z = Math.PI / 2;
+                    glassGroup.add(bridge);
+                    
+                    glassGroup.position.set(0, 2.05 * scale, 0.22 * scale);
+                    group.add(glassGroup);
+                }
+                break;
+                
+            case 'enemy':
+                // Tactical helmet
+                const helmetGeometry = new THREE.SphereGeometry(0.28 * scale, 12, 8);
+                helmetGeometry.scale(1, 0.8, 1);
+                const helmetMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x2A2A2A,
+                    roughness: 0.3,
+                    metalness: 0.7
+                });
+                const helmet = new THREE.Mesh(helmetGeometry, helmetMaterial);
+                helmet.position.set(0, 2.1 * scale, 0);
+                group.add(helmet);
+                
+                // Visor
+                const visorGeometry = new THREE.BoxGeometry(0.24 * scale, 0.08 * scale, 0.02 * scale);
+                const visorMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x000000,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const visor = new THREE.Mesh(visorGeometry, visorMaterial);
+                visor.position.set(0, 2.02 * scale, 0.26 * scale);
+                group.add(visor);
+                break;
+        }
+    }
+    
+    createEnemyWeapon(weaponGroup, scale) {
+        // Create assault rifle
+        const bodyGeometry = new THREE.BoxGeometry(0.08 * scale, 0.15 * scale, 0.6 * scale);
+        const bodyMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x2C2C2C,
+            metalness: 0.8,
             roughness: 0.3
         });
+        const weaponBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        weaponGroup.add(weaponBody);
         
-        const leftArm = new THREE.Mesh(this.geometries.arm, armMaterial);
-        leftArm.position.set(-0.7, 1, 0);
-        leftArm.castShadow = true;
-        group.add(leftArm);
-        
-        const rightArm = new THREE.Mesh(this.geometries.arm, armMaterial);
-        rightArm.position.set(0.7, 1, 0);
-        rightArm.castShadow = true;
-        group.add(rightArm);
-    }
-    
-    addEnemyLegs(group) {
-        // Left leg (upside down cone, larger)
-        const leftLeg = new THREE.Mesh(this.geometries.enemyLeg, this.materials.enemyLegs);
-        leftLeg.position.set(-0.25, 0.45, 0);
-        leftLeg.rotation.x = Math.PI; // Flip upside down
-        leftLeg.castShadow = true;
-        group.add(leftLeg);
-        
-        // Right leg (upside down cone, larger)
-        const rightLeg = new THREE.Mesh(this.geometries.enemyLeg, this.materials.enemyLegs);
-        rightLeg.position.set(0.25, 0.45, 0);
-        rightLeg.rotation.x = Math.PI; // Flip upside down
-        rightLeg.castShadow = true;
-        group.add(rightLeg);
-    }
-    
-    createEnemyWeapon() {
-        const weaponGroup = new THREE.Group();
-        
-        // Gun barrel
-        const barrel = new THREE.Mesh(this.geometries.gunBarrel, this.materials.weapon);
+        // Barrel
+        const barrelGeometry = new THREE.CylinderGeometry(0.02 * scale, 0.02 * scale, 0.4 * scale, 8);
+        const barrel = new THREE.Mesh(barrelGeometry, bodyMaterial);
         barrel.rotation.z = Math.PI / 2;
-        barrel.position.set(0.2, 0, 0);
+        barrel.position.set(0, 0, 0.5 * scale);
         weaponGroup.add(barrel);
         
-        // Gun body
-        const gunBody = new THREE.Mesh(this.geometries.gunBody, this.materials.weapon);
-        gunBody.position.set(0, 0, -0.1);
-        weaponGroup.add(gunBody);
+        // Stock
+        const stockGeometry = new THREE.BoxGeometry(0.06 * scale, 0.12 * scale, 0.2 * scale);
+        const stock = new THREE.Mesh(stockGeometry, bodyMaterial);
+        stock.position.set(0, 0, -0.4 * scale);
+        weaponGroup.add(stock);
         
         return weaponGroup;
     }
     
-    generateCharacterName(type) {
-        const names = {
-            criminal: ['Tony "The Fish"', 'Marco Volkov', 'Eddie "Knuckles"', 'Vince Romano', 'Sal "The Snake"', 'Tommy Two-Times'],
-            police: ['Officer Johnson', 'Detective Martinez', 'Sergeant Williams', 'Captain Davis', 'Lieutenant Brown', 'Detective Chen'],
-            civilian: ['Sarah Chen', 'Mike Thompson', 'Lisa Rodriguez', 'James Wilson', 'Emma Davis', 'Alex Parker']
-        };
+    animateCharacter(character, animationType = 'idle') {
+        if (!character || !character.userData) return;
         
-        return names[type][Math.floor(Math.random() * names[type].length)];
+        const time = Date.now() * 0.001;
+        
+        switch (animationType) {
+            case 'idle':
+                this.animateIdle(character, time);
+                break;
+            case 'walk':
+                this.animateWalk(character, time);
+                break;
+        }
+    }
+    
+    animateIdle(character, time) {
+        // Subtle breathing animation
+        if (character.userData.components && character.userData.components.torso) {
+            character.userData.components.torso.scale.y = 1 + Math.sin(time * 2) * 0.02;
+        }
+        
+        // Slight head movement
+        if (character.userData.components && character.userData.components.head) {
+            character.userData.components.head.rotation.y = Math.sin(time * 0.5) * 0.1;
+        }
+    }
+    
+    animateWalk(character, time) {
+        const components = character.userData.components;
+        if (!components) return;
+        
+        // Arm swinging
+        if (components.leftArm) {
+            components.leftArm.rotation.x = Math.sin(time * 8) * 0.3;
+        }
+        if (components.rightArm) {
+            components.rightArm.rotation.x = -Math.sin(time * 8) * 0.3;
+        }
+        
+        // Leg movement
+        if (components.leftLeg) {
+            components.leftLeg.rotation.x = Math.sin(time * 8) * 0.2;
+        }
+        if (components.rightLeg) {
+            components.rightLeg.rotation.x = -Math.sin(time * 8) * 0.2;
+        }
+        
+        // Head bob
+        if (components.head) {
+            components.head.position.y = 2.0 + Math.sin(time * 16) * 0.05;
+        }
     }
 }
 
-// Make CharacterDesign globally available
 window.CharacterDesign = CharacterDesign;
+console.log("CharacterDesign class loaded with detailed facial features and limbs");
