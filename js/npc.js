@@ -332,7 +332,7 @@ class Enemy {
         const distanceToPlayer = this.getDistanceToPlayer(playerPosition);
         
         // Check if player has weapon equipped (makes them more detectable)
-        const playerHasWeapon = window.game && window.game.player && window.game.player.weaponEquipped;
+        const playerHasWeapon = window.game && window.game.player && window.game.player.weapon && window.game.player.weapon.isEquipped;
         const detectionMultiplier = playerHasWeapon ? 1.5 : 1.0;
         const adjustedDetectionRange = this.detectionRange * detectionMultiplier;
         
@@ -414,9 +414,6 @@ class Enemy {
             this.ammo--;
             this.lastShotTime = now;
             
-            // Create muzzle flash
-            this.createMuzzleFlash();
-            
             // Face player when shooting
             const direction = new THREE.Vector3(
                 playerPosition.x - this.body.position.x,
@@ -426,17 +423,50 @@ class Enemy {
             const angle = Math.atan2(direction.x, direction.z);
             this.group.rotation.y = angle;
             
-            // Check if shot hits player
-            const hitRoll = Math.random();
-            
-            if (hitRoll < this.accuracy) {
-                console.log(`Enemy shoots player! Ammo left: ${this.ammo}`);
-                this.damagePlayer();
+            // Use bullet system if available
+            if (window.game && window.game.bulletSystem) {
+                // Calculate shooting position from enemy weapon
+                const shootPosition = new THREE.Vector3();
+                shootPosition.copy(this.body.position);
+                shootPosition.y += 1.2; // Shoulder height
+                shootPosition.x += direction.x * 0.5; // Move forward a bit
+                shootPosition.z += direction.z * 0.5;
                 
-                // Create hit effect
-                this.createHitEffect(playerPosition);
+                // Calculate target position with some prediction
+                const targetPos = new THREE.Vector3();
+                targetPos.copy(playerPosition);
+                targetPos.y += 1; // Aim at player torso
+                
+                // Calculate direction to target
+                const shootDirection = new THREE.Vector3();
+                shootDirection.subVectors(targetPos, shootPosition).normalize();
+                
+                // Add some inaccuracy to enemy shots
+                const inaccuracy = 0.1;
+                shootDirection.x += (Math.random() - 0.5) * inaccuracy;
+                shootDirection.y += (Math.random() - 0.5) * inaccuracy;
+                shootDirection.z += (Math.random() - 0.5) * inaccuracy;
+                shootDirection.normalize();
+                
+                // Create enemy bullet
+                const bullet = window.game.bulletSystem.createBullet(
+                    shootPosition, 
+                    shootDirection, 
+                    40, // enemy bullet speed
+                    25, // damage
+                    'enemy'
+                );
+                
+                if (bullet) {
+                    console.log(`Enemy shoots at player! Ammo left: ${this.ammo}`);
+                    this.createMuzzleFlash();
+                } else {
+                    console.warn("Failed to create enemy bullet, using fallback");
+                    this.fallbackShoot(playerPosition);
+                }
             } else {
-                console.log(`Enemy missed! Ammo left: ${this.ammo}`);
+                console.warn("Bullet system not available, using fallback");
+                this.fallbackShoot(playerPosition);
             }
             
             if (this.ammo <= 0) {
@@ -446,51 +476,98 @@ class Enemy {
     }
     
     createMuzzleFlash() {
-        // Create muzzle flash at weapon barrel
-        const flashGeometry = new THREE.SphereGeometry(0.08, 6, 6);
-        const flashMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
-            emissive: 0xffff00,
-            emissiveIntensity: 1
-        });
-        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
-        
-        // Position at weapon barrel
-        const weaponPos = this.weaponGroup.position.clone();
-        flash.position.copy(weaponPos);
-        flash.position.x += 0.3; // Barrel tip
-        
-        this.group.add(flash);
-        
-        // Remove flash after brief moment
-        setTimeout(() => {
-            this.group.remove(flash);
-        }, 100);
+        try {
+            if (!this.weaponGroup) {
+                console.warn("No weapon group available for muzzle flash");
+                return;
+            }
+            
+            // Remove existing muzzle flash
+            if (this.muzzleFlash) {
+                this.weaponGroup.remove(this.muzzleFlash);
+            }
+            
+            // Create muzzle flash effect
+            const flashGeometry = new THREE.SphereGeometry(0.08, 6, 4);
+            const flashMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFFFF00,
+                emissive: 0xFFAA00,
+                transparent: true,
+                opacity: 0.9
+            });
+            
+            this.muzzleFlash = new THREE.Mesh(flashGeometry, flashMaterial);
+            this.muzzleFlash.position.set(0, 0, 0.5); // At barrel tip
+            this.weaponGroup.add(this.muzzleFlash);
+            
+            // Remove flash after short time
+            setTimeout(() => {
+                if (this.muzzleFlash && this.weaponGroup) {
+                    this.weaponGroup.remove(this.muzzleFlash);
+                    this.muzzleFlash = null;
+                }
+            }, 80);
+            
+        } catch (error) {
+            console.error("Error creating enemy muzzle flash:", error);
+        }
     }
     
-    createHitEffect(playerPosition) {
-        // Create blood/impact effect at player position
-        const effectGeometry = new THREE.SphereGeometry(0.2, 6, 6);
-        const effectMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            transparent: true,
-            opacity: 0.8
-        });
-        const effect = new THREE.Mesh(effectGeometry, effectMaterial);
-        effect.position.set(playerPosition.x, playerPosition.y + 1, playerPosition.z);
-        this.scene.add(effect);
-        
-        // Remove effect after short time
-        setTimeout(() => {
-            this.scene.remove(effect);
-        }, 500);
+    // Add missing createHitEffect method
+    createHitEffect(targetPosition) {
+        try {
+            // Create hit spark effect at target position
+            const sparkGeometry = new THREE.SphereGeometry(0.1, 8, 6);
+            const sparkMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFF4444,
+                emissive: 0xFF2222,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
+            spark.position.copy(targetPosition);
+            this.scene.add(spark);
+            
+            // Remove spark after short time
+            setTimeout(() => {
+                this.scene.remove(spark);
+            }, 200);
+            
+        } catch (error) {
+            console.error("Error creating hit effect:", error);
+        }
     }
     
+    // Add missing damagePlayer method
     damagePlayer() {
-        // Damage player with exactly 25 damage (4 hits to kill)
-        if (window.game && window.game.playerTakeDamage) {
-            window.game.playerTakeDamage(this.attackDamage);
-            console.log(`Player takes ${this.attackDamage} damage from enemy weapon!`);
+        try {
+            if (window.game && typeof window.game.playerTakeDamage === 'function') {
+                window.game.playerTakeDamage(this.attackDamage);
+                console.log(`Enemy hits player for ${this.attackDamage} damage!`);
+            } else {
+                console.warn("Game damage system not available");
+            }
+        } catch (error) {
+            console.error("Error damaging player:", error);
+        }
+    }
+    
+    fallbackShoot(playerPosition) {
+        // Fallback shooting method without bullet system
+        try {
+            this.createMuzzleFlash();
+            
+            const hitRoll = Math.random();
+            if (hitRoll < this.accuracy) {
+                console.log(`Enemy shoots player! Ammo left: ${this.ammo}`);
+                this.damagePlayer();
+                this.createHitEffect(playerPosition);
+            } else {
+                console.log(`Enemy missed! Ammo left: ${this.ammo}`);
+            }
+        } catch (error) {
+            console.error("Error in fallback shoot:", error);
         }
     }
     
@@ -503,15 +580,20 @@ class Enemy {
         // Visual damage effect
         this.group.traverse((child) => {
             if (child.material && child.material.emissive) {
-                const originalEmissive = child.material.emissive.getHex();
-                child.material.emissive.setHex(0xff4400);
+                child.material.emissive.setHex(0x440000);
                 setTimeout(() => {
                     if (!this.isDead) {
-                        child.material.emissive.setHex(originalEmissive);
+                        child.material.emissive.setHex(0x000000);
                     }
-                }, 300);
+                }, 200);
             }
         });
+        
+        // Immediately become aggressive when shot
+        if (!this.playerDetected) {
+            this.playerDetected = true;
+            this.state = 'chase';
+        }
         
         if (this.health <= 0) {
             this.die();
@@ -519,10 +601,15 @@ class Enemy {
         }
         
         // Become more aggressive when damaged
-        this.detectionRange = Math.min(this.detectionRange + 2, 20);
+        this.detectionRange = Math.min(this.detectionRange + 2, 30);
         this.speed = Math.min(this.speed + 0.5, 5);
         
-        return false; // Still alive
+        // If enemy has ammo, prefer shooting over chasing
+        if (this.ammo > 0 && this.state === 'chase') {
+            this.state = 'shoot';
+        }
+        
+        return false;
     }
     
     die() {
@@ -532,39 +619,34 @@ class Enemy {
         this.health = 0;
         console.log("REPO Enemy eliminated!");
         
-        // Notify mission manager FIRST before anything else
+        // Notify mission manager
         if (window.game && window.game.missionManager) {
-            console.log("Notifying mission manager of enemy elimination");
             window.game.missionManager.enemyEliminated();
-        } else {
-            console.error("Mission manager not available for enemy elimination notification");
         }
         
-        // Death animation - sparks and fall
+        // Death animation - fall over
         this.group.rotation.z = Math.PI / 2;
         this.group.position.y -= 0.5;
         
-        // Change appearance to show destruction
+        // Change color to indicate death
         this.group.traverse((child) => {
             if (child.material) {
-                child.material.color.multiplyScalar(0.2);
-                if (child.material.emissive) {
-                    child.material.emissive.setHex(0x440000);
-                }
+                child.material.color.multiplyScalar(0.3);
+                child.material.emissive.setHex(0x000000);
             }
         });
         
         // Remove physics body
-        if (this.body) {
+        if (this.body && this.world) {
             this.world.removeBody(this.body);
         }
         
-        // Remove from scene after delay
+        // Remove from scene after a delay
         setTimeout(() => {
-            if (this.group && this.scene) {
+            if (this.scene && this.group) {
                 this.scene.remove(this.group);
             }
-        }, 8000);
+        }, 5000);
     }
 }
 

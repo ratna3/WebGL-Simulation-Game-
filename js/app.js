@@ -14,7 +14,8 @@ class Game {
         this.player = null;
         this.npcManager = null;
         this.dialogueSystem = null;
-        this.missionManager = null; // Add mission manager
+        this.missionManager = null;
+        this.bulletSystem = null; // Add bullet system
         
         // Game state
         this.isGameActive = false;
@@ -40,9 +41,35 @@ class Game {
             this.setupBasicEnvironment();
             debugLog("Basic environment setup complete");
             
+            // Initialize bullet system with error handling
+            try {
+                if (typeof BulletSystem !== 'undefined') {
+                    this.bulletSystem = new BulletSystem(this.scene, this.world);
+                    debugLog("Bullet system initialized successfully");
+                } else {
+                    console.error("BulletSystem class not available - check if bulletSystem.js loaded");
+                    throw new Error("BulletSystem class not found");
+                }
+            } catch (bulletError) {
+                console.error("Failed to initialize bullet system:", bulletError);
+                // Create a dummy bullet system to prevent crashes
+                this.bulletSystem = {
+                    createBullet: () => {
+                        console.warn("Dummy bullet system - bullets disabled");
+                        return null;
+                    },
+                    update: () => {},
+                    cleanup: () => {}
+                };
+            }
+            
             // Initialize mission manager
-            this.missionManager = new MissionManager(this);
-            debugLog("Mission manager initialized");
+            if (typeof MissionManager !== 'undefined') {
+                this.missionManager = new MissionManager(this);
+                debugLog("Mission manager initialized");
+            } else {
+                console.error("MissionManager class not available");
+            }
             
             // Make instance globally available
             window.game = this;
@@ -244,6 +271,11 @@ class Game {
         this.playerHealth = this.maxPlayerHealth;
         this.updateHealthBar();
         
+        // Clean up bullet system
+        if (this.bulletSystem) {
+            this.bulletSystem.cleanup();
+        }
+        
         // Reset mission state
         this.missionManager = new MissionManager(this);
         
@@ -416,6 +448,15 @@ class Game {
                 this.world.step(1/60, delta, 3);
             }
             
+            // Update bullet system with error handling
+            if (this.bulletSystem && typeof this.bulletSystem.update === 'function') {
+                try {
+                    this.bulletSystem.update(delta);
+                } catch (bulletError) {
+                    console.error("Bullet system update error:", bulletError);
+                }
+            }
+            
             // Update environment
             if (this.environment) {
                 this.environment.update(delta);
@@ -426,10 +467,14 @@ class Game {
                 this.player.update(delta);
             }
             
-            // Update NPCs and enemies
+            // Update NPCs and enemies with error handling
             if (this.npcManager && this.player && this.player.body) {
-                const playerPosition = this.player.body.position;
-                this.npcManager.update(playerPosition, delta);
+                try {
+                    const playerPosition = this.player.body.position;
+                    this.npcManager.update(playerPosition, delta);
+                } catch (npcError) {
+                    console.error("NPC update error:", npcError);
+                }
             }
         } catch (error) {
             console.error("Error in game update:", error);

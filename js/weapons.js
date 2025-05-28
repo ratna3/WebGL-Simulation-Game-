@@ -3,68 +3,59 @@ class Weapon {
         this.scene = scene;
         this.camera = camera;
         this.world = world;
-        this.mesh = null;
+        this.isEquipped = false;
+        this.weaponGroup = null;
+        this.bulletSystem = null;
         
         // Weapon stats
-        this.damage = 25;
-        this.ammo = 30;
+        this.damage = 30;
         this.maxAmmo = 30;
-        this.totalAmmo = 120;
-        this.fireRate = 150; // milliseconds between shots
-        this.lastShot = 0;
-        this.isReloading = false;
+        this.currentAmmo = this.maxAmmo;
         this.reloadTime = 2000; // 2 seconds
+        this.fireRate = 200; // ms between shots
+        this.lastShotTime = 0;
+        this.isReloading = false;
         
-        // Weapon state
-        this.isEquipped = false;
+        // Visual elements
+        this.muzzleFlash = null;
+        this.weaponModel = null;
         
-        this.init();
+        console.log("Weapon system initialized");
+        this.createWeaponModel();
+        // DON'T setup event listeners here - let player handle them
     }
     
-    init() {
-        this.createWeaponModel();
-        this.setupControls();
-        console.log("Weapon system initialized");
-    }
+    // Remove setupEventListeners to avoid duplicate handlers
+    // The player.js will handle all input events
     
     createWeaponModel() {
         try {
-            // Create weapon group
             this.weaponGroup = new THREE.Group();
             
-            // Gun body
-            const bodyGeometry = new THREE.BoxGeometry(0.1, 0.2, 0.4);
-            const bodyMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x222222,
+            // Create weapon body (simple box for now)
+            const weaponGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.4);
+            const weaponMaterial = new THREE.MeshStandardMaterial({
+                color: 0x333333,
                 metalness: 0.8,
                 roughness: 0.2
             });
-            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            body.position.set(0, 0, 0);
-            this.weaponGroup.add(body);
             
-            // Gun barrel
+            this.weaponModel = new THREE.Mesh(weaponGeometry, weaponMaterial);
+            this.weaponModel.position.set(0.3, -0.2, 0.3);
+            this.weaponGroup.add(this.weaponModel);
+            
+            // Add weapon barrel
             const barrelGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8);
-            const barrelMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x111111,
+            const barrelMaterial = new THREE.MeshStandardMaterial({
+                color: 0x222222,
                 metalness: 0.9,
                 roughness: 0.1
             });
+            
             const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
             barrel.rotation.z = Math.PI / 2;
-            barrel.position.set(0, 0, 0.35);
-            this.weaponGroup.add(barrel);
-            
-            // Position weapon relative to camera
-            this.weaponGroup.position.set(0.3, -0.2, -0.5);
-            this.weaponGroup.rotation.x = 0.1;
-            this.weaponGroup.scale.set(2, 2, 2);
-            
-            // Initially hide weapon
-            this.weaponGroup.visible = false;
-            
-            // Add to camera so it moves with player view
-            this.camera.add(this.weaponGroup);
+            barrel.position.set(0.15, 0, 0);
+            this.weaponModel.add(barrel);
             
             console.log("Weapon model created");
         } catch (error) {
@@ -72,158 +63,162 @@ class Weapon {
         }
     }
     
-    setupControls() {
-        try {
-            // Tab key - Toggle weapon
-            document.addEventListener('keydown', (event) => {
-                if (event.code === 'Tab') {
-                    event.preventDefault();
-                    this.toggleWeapon();
-                }
-                
-                // R key - Reload
-                if (event.code === 'KeyR') {
-                    event.preventDefault();
-                    this.reload();
-                }
-            });
-            
-            // Mouse click - Shoot (only if pointer is locked)
-            document.addEventListener('click', (event) => {
-                if (this.isEquipped && !this.isReloading && document.pointerLockElement === document.body) {
-                    this.shoot();
-                }
-            });
-            
-            console.log("Weapon controls set up");
-        } catch (error) {
-            console.error("Error setting up weapon controls:", error);
+    equip() {
+        if (this.isEquipped) return;
+        
+        this.isEquipped = true;
+        this.camera.add(this.weaponGroup);
+        
+        // Connect to bullet system
+        if (window.game && window.game.bulletSystem) {
+            this.bulletSystem = window.game.bulletSystem;
         }
+        
+        this.updateAmmoDisplay();
+        console.log("Weapon equipped");
     }
     
-    toggleWeapon() {
-        try {
-            this.isEquipped = !this.isEquipped;
-            
-            if (this.weaponGroup) {
-                this.weaponGroup.visible = this.isEquipped;
-            }
-            
-            // Update HUD
-            this.updateAmmoDisplay();
-            
-            console.log(`Weapon ${this.isEquipped ? 'equipped' : 'holstered'}`);
-            
-            // Update cover status when weapon is drawn
-            if (window.game && window.game.dialogueSystem) {
-                if (this.isEquipped) {
-                    window.game.dialogueSystem.playerCover -= 20; // Drawing weapon reduces cover
-                    window.game.dialogueSystem.updateCoverStatus();
-                }
-            }
-        } catch (error) {
-            console.error("Error toggling weapon:", error);
-        }
+    holster() {
+        if (!this.isEquipped) return;
+        
+        this.isEquipped = false;
+        this.camera.remove(this.weaponGroup);
+        this.updateAmmoDisplay();
+        console.log("Weapon holstered");
     }
     
-    shoot() {
+    fire() {
+        if (!this.isEquipped || this.isReloading) return false;
+        
+        const now = Date.now();
+        if (now - this.lastShotTime < this.fireRate) return false;
+        
+        if (this.currentAmmo <= 0) {
+            this.reload();
+            return false;
+        }
+        
+        this.currentAmmo--;
+        this.lastShotTime = now;
+        
+        // Fire bullet
+        this.fireBullet();
+        
+        // Create muzzle flash
+        this.createMuzzleFlash();
+        
+        // Update ammo display
+        this.updateAmmoDisplay();
+        
+        console.log(`Shot fired! Ammo: ${this.currentAmmo}/${this.maxAmmo}`);
+        return true;
+    }
+    
+    fireBullet() {
         try {
-            if (!this.isEquipped || this.isReloading) return;
+            // Ensure bullet system is available with multiple checks
+            if (!this.bulletSystem) {
+                if (window.game && window.game.bulletSystem) {
+                    this.bulletSystem = window.game.bulletSystem;
+                    console.log("Bullet system connected to weapon");
+                } else {
+                    console.warn("Bullet system not available, falling back to raycast");
+                    this.performRaycast();
+                    return;
+                }
+            }
             
-            const now = Date.now();
-            if (now - this.lastShot < this.fireRate) return;
-            
-            if (this.ammo <= 0) {
-                console.log("Out of ammo! Press R to reload");
+            if (!this.bulletSystem || typeof this.bulletSystem.createBullet !== 'function') {
+                console.warn("Bullet system not properly initialized, falling back to raycast");
+                this.performRaycast();
                 return;
             }
             
-            this.ammo--;
-            this.lastShot = now;
-            
-            // Create muzzle flash effect
-            this.createMuzzleFlash();
-            
-            // Perform raycast to check for hits
-            this.performRaycast();
-            
-            // Update ammo display
-            this.updateAmmoDisplay();
-            
-            // Weapon recoil animation
-            this.createRecoilEffect();
-            
-            console.log(`Shot fired! Ammo: ${this.ammo}/${this.maxAmmo}`);
-            
-            // Blow cover when shooting
-            if (window.game && window.game.dialogueSystem) {
-                window.game.dialogueSystem.blowCover();
-            }
-        } catch (error) {
-            console.error("Error shooting:", error);
-        }
-    }
-    
-    createMuzzleFlash() {
-        try {
-            // Create bright flash at barrel tip
-            const flashGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-            const flashMaterial = new THREE.MeshBasicMaterial({
-                color: 0xFFFF00,
-                transparent: true,
-                opacity: 0.8
-            });
-            const flash = new THREE.Mesh(flashGeometry, flashMaterial);
-            
+            // Calculate bullet start position (weapon barrel)
+            const startPosition = new THREE.Vector3();
             if (this.weaponGroup) {
-                flash.position.set(0, 0, 0.5);
-                this.weaponGroup.add(flash);
-                
-                // Remove flash after short duration
-                setTimeout(() => {
-                    this.weaponGroup.remove(flash);
-                }, 50);
+                // Get weapon barrel position in world space
+                const barrelOffset = new THREE.Vector3(0.3, 0, 0.35); // Barrel tip position
+                this.weaponGroup.localToWorld(barrelOffset);
+                startPosition.copy(barrelOffset);
+            } else {
+                // Fallback to camera position with offset
+                startPosition.copy(this.camera.position);
+                const cameraDirection = new THREE.Vector3();
+                this.camera.getWorldDirection(cameraDirection);
+                startPosition.add(cameraDirection.multiplyScalar(0.5));
             }
+            
+            // Get shooting direction
+            const direction = new THREE.Vector3();
+            this.camera.getWorldDirection(direction);
+            
+            // Add slight random spread for realism
+            const spread = 0.02;
+            direction.x += (Math.random() - 0.5) * spread;
+            direction.y += (Math.random() - 0.5) * spread;
+            direction.z += (Math.random() - 0.5) * spread;
+            direction.normalize();
+            
+            // Create bullet
+            const bullet = this.bulletSystem.createBullet(
+                startPosition, 
+                direction, 
+                60, // bullet speed
+                this.damage, 
+                'player'
+            );
+            
+            if (bullet) {
+                console.log("Player bullet fired successfully");
+            } else {
+                console.warn("Failed to create bullet, using raycast fallback");
+                this.performRaycast();
+            }
+            
         } catch (error) {
-            console.error("Error creating muzzle flash:", error);
+            console.error("Error firing bullet:", error);
+            // Fallback to raycast
+            this.performRaycast();
         }
     }
     
     performRaycast() {
+        // Fallback raycast implementation
         try {
-            // Create raycaster from camera center
             const raycaster = new THREE.Raycaster();
-            const direction = new THREE.Vector3(0, 0, -1);
-            
+            const direction = new THREE.Vector3();
             this.camera.getWorldDirection(direction);
+            
             raycaster.set(this.camera.position, direction);
             
-            // Check for hits on enemies
+            // Check for intersections with NPCs/enemies
             if (window.game && window.game.npcManager) {
-                const enemies = window.game.npcManager.enemies;
-                const intersectable = [];
+                const targets = [...window.game.npcManager.npcs, ...window.game.npcManager.enemies];
+                const intersections = [];
                 
-                enemies.forEach(enemy => {
-                    if (enemy.group && !enemy.isDead) {
-                        enemy.group.traverse(child => {
-                            if (child.isMesh) {
-                                intersectable.push(child);
-                            }
-                        });
+                targets.forEach(target => {
+                    if (target.group) {
+                        const targetIntersects = raycaster.intersectObject(target.group, true);
+                        if (targetIntersects.length > 0) {
+                            intersections.push({
+                                object: target,
+                                distance: targetIntersects[0].distance,
+                                point: targetIntersects[0].point
+                            });
+                        }
                     }
                 });
                 
-                const intersects = raycaster.intersectObjects(intersectable);
-                
-                if (intersects.length > 0) {
-                    // Find which enemy was hit
-                    const hitObject = intersects[0].object;
+                // Sort by distance and hit the closest
+                if (intersections.length > 0) {
+                    intersections.sort((a, b) => a.distance - b.distance);
+                    const target = intersections[0].object;
                     
-                    enemies.forEach(enemy => {
-                        if (enemy.group && enemy.group.children.includes(hitObject)) {
-                            this.hitEnemy(enemy, intersects[0].point);
-                        }
-                    });
+                    if (typeof target.takeDamage === 'function') {
+                        target.takeDamage(this.damage);
+                        console.log("Raycast hit target!");
+                    }
                 }
             }
         } catch (error) {
@@ -231,134 +226,87 @@ class Weapon {
         }
     }
     
-    hitEnemy(enemy, hitPoint) {
+    createMuzzleFlash() {
         try {
-            console.log(`Hit enemy: ${enemy.name || 'Unknown'}`);
-            
-            // Create hit effect
-            this.createHitEffect(hitPoint);
-            
-            // Damage enemy
-            if (enemy.takeDamage) {
-                enemy.takeDamage(this.damage);
-            } else if (enemy.health !== undefined) {
-                enemy.health -= this.damage;
-                if (enemy.health <= 0 && !enemy.isDead) {
-                    enemy.die();
-                }
+            if (this.muzzleFlash) {
+                this.weaponModel.remove(this.muzzleFlash);
             }
-        } catch (error) {
-            console.error("Error hitting enemy:", error);
-        }
-    }
-    
-    createHitEffect(position) {
-        try {
-            // Create spark effect at hit location
-            const sparkGeometry = new THREE.SphereGeometry(0.2, 6, 6);
-            const sparkMaterial = new THREE.MeshBasicMaterial({
-                color: 0xFF4444,
+            
+            // Create muzzle flash effect
+            const flashGeometry = new THREE.SphereGeometry(0.05, 6, 4);
+            const flashMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFFFF00,
+                emissive: 0xFFAA00,
                 transparent: true,
                 opacity: 0.8
             });
-            const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
-            spark.position.copy(position);
             
-            this.scene.add(spark);
+            this.muzzleFlash = new THREE.Mesh(flashGeometry, flashMaterial);
+            this.muzzleFlash.position.set(0.3, 0, 0);
+            this.weaponModel.add(this.muzzleFlash);
             
-            // Animate and remove spark
+            // Remove flash after short time
             setTimeout(() => {
-                this.scene.remove(spark);
-            }, 200);
-        } catch (error) {
-            console.error("Error creating hit effect:", error);
-        }
-    }
-    
-    createRecoilEffect() {
-        try {
-            if (!this.weaponGroup) return;
-            
-            // Simple recoil animation
-            const originalPosition = this.weaponGroup.position.clone();
-            
-            // Kick back
-            this.weaponGroup.position.z += 0.05;
-            this.weaponGroup.rotation.x += 0.1;
-            
-            // Return to original position
-            setTimeout(() => {
-                if (this.weaponGroup) {
-                    this.weaponGroup.position.copy(originalPosition);
-                    this.weaponGroup.rotation.x -= 0.1;
+                if (this.muzzleFlash && this.weaponModel) {
+                    this.weaponModel.remove(this.muzzleFlash);
+                    this.muzzleFlash = null;
                 }
-            }, 100);
+            }, 50);
+            
         } catch (error) {
-            console.error("Error creating recoil effect:", error);
+            console.error("Error creating muzzle flash:", error);
         }
     }
     
     reload() {
-        try {
-            if (this.isReloading || this.ammo === this.maxAmmo || this.totalAmmo <= 0) {
-                return;
-            }
-            
-            this.isReloading = true;
-            console.log("Reloading...");
-            
-            // Update UI to show reloading
+        if (this.isReloading || this.currentAmmo === this.maxAmmo) return;
+        
+        this.isReloading = true;
+        console.log("Reloading weapon...");
+        
+        setTimeout(() => {
+            this.currentAmmo = this.maxAmmo;
+            this.isReloading = false;
             this.updateAmmoDisplay();
-            
-            setTimeout(() => {
-                const ammoNeeded = this.maxAmmo - this.ammo;
-                const ammoToAdd = Math.min(ammoNeeded, this.totalAmmo);
-                
-                this.ammo += ammoToAdd;
-                this.totalAmmo -= ammoToAdd;
-                this.isReloading = false;
-                
-                console.log(`Reload complete! Ammo: ${this.ammo}/${this.maxAmmo}, Total: ${this.totalAmmo}`);
-                this.updateAmmoDisplay();
-            }, this.reloadTime);
-        } catch (error) {
-            console.error("Error reloading:", error);
-        }
+            console.log("Reload complete!");
+        }, this.reloadTime);
     }
     
     updateAmmoDisplay() {
-        try {
-            const ammoElement = document.querySelector('.ammo-count');
-            if (ammoElement) {
-                if (!this.isEquipped) {
-                    ammoElement.textContent = "Weapon Holstered";
-                    ammoElement.style.color = "white";
-                } else if (this.isReloading) {
-                    ammoElement.textContent = "Reloading...";
-                    ammoElement.style.color = "yellow";
-                } else {
-                    ammoElement.textContent = `${this.ammo}/${this.maxAmmo} (${this.totalAmmo})`;
-                    ammoElement.style.color = this.ammo <= 5 ? "red" : "white";
-                }
+        const ammoElement = document.querySelector('.ammo-count');
+        if (ammoElement) {
+            if (!this.isEquipped) {
+                ammoElement.textContent = "Weapon Holstered";
+                ammoElement.style.color = "#888";
+            } else if (this.isReloading) {
+                ammoElement.textContent = "Reloading...";
+                ammoElement.style.color = "#ffaa00";
+            } else {
+                ammoElement.textContent = `Ammo: ${this.currentAmmo}/${this.maxAmmo}`;
+                ammoElement.style.color = this.currentAmmo > 5 ? "#fff" : "#ff3e3e";
             }
-        } catch (error) {
-            console.error("Error updating ammo display:", error);
         }
     }
     
     update(delta) {
-        try {
-            // Weapon updates if needed
-            if (this.isEquipped && this.weaponGroup) {
-                // Subtle weapon sway or breathing effect
-                const time = Date.now() * 0.001;
-                this.weaponGroup.position.y = -0.2 + Math.sin(time * 2) * 0.005;
-            }
-        } catch (error) {
-            console.error("Error updating weapon:", error);
+        if (this.isEquipped && this.weaponGroup) {
+            // Add slight weapon sway for realism
+            const time = Date.now() * 0.001;
+            this.weaponModel.position.x = 0.3 + Math.sin(time * 2) * 0.002;
+            this.weaponModel.position.y = -0.2 + Math.cos(time * 1.5) * 0.001;
         }
+    }
+    
+    destroy() {
+        // Clean up 3D objects only (no event listeners to remove)
+        if (this.weaponGroup && this.camera) {
+            this.camera.remove(this.weaponGroup);
+        }
+        
+        console.log("Weapon destroyed");
     }
 }
 
-// Make Weapon class globally available
+// Make Weapon globally available
 window.Weapon = Weapon;
+console.log("Weapon class loaded successfully");

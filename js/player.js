@@ -132,7 +132,8 @@ class Player {
                 this.controls = {
                     lock: () => console.log("Pointer lock not available"),
                     unlock: () => console.log("Pointer lock not available"),
-                    isLocked: false
+                    isLocked: false,
+                    getObject: () => new THREE.Object3D()
                 };
             }
         } catch (error) {
@@ -141,31 +142,44 @@ class Player {
             this.controls = {
                 lock: () => console.log("Controls unavailable"),
                 unlock: () => console.log("Controls unavailable"),
-                isLocked: false
+                isLocked: false,
+                getObject: () => new THREE.Object3D()
             };
         }
     }
     
     setupPointerLockEvents() {
+        // Add a small delay to prevent immediate pointer lock requests
+        this.pointerLockCooldown = 0;
+        this.lastPointerLockRequest = 0;
+        
         // Handle pointer lock changes
         const onPointerLockChange = () => {
             if (document.pointerLockElement === document.body) {
                 this.controls.isLocked = true;
-                console.log("Pointer lock acquired");
+                console.log("Pointer lock acquired successfully");
+                // Hide cursor and show game UI
+                document.body.style.cursor = 'none';
             } else {
                 this.controls.isLocked = false;
                 console.log("Pointer lock released");
+                // Show cursor
+                document.body.style.cursor = 'default';
             }
         };
         
         const onPointerLockError = (event) => {
-            console.error("Pointer lock error:", event);
+            console.warn("Pointer lock error (this is normal):", event.type);
+            this.controls.isLocked = false;
+            // Reset cooldown on error
+            this.pointerLockCooldown = Date.now() + 1000; // 1 second cooldown
         };
         
+        // Add event listeners for all browsers
         document.addEventListener('pointerlockchange', onPointerLockChange);
         document.addEventListener('pointerlockerror', onPointerLockError);
         
-        // Also handle vendor prefixes
+        // Vendor prefixes
         document.addEventListener('mozpointerlockchange', onPointerLockChange);
         document.addEventListener('webkitpointerlockchange', onPointerLockChange);
         document.addEventListener('mozpointerlockerror', onPointerLockError);
@@ -175,38 +189,96 @@ class Player {
     setupInputHandlers() {
         console.log("Setting up player input handlers");
         
-        // Handle pointer lock request safely
+        // Safe pointer lock request function
+        const requestPointerLockSafely = () => {
+            const now = Date.now();
+            
+            // Check cooldown to prevent spam requests
+            if (now < this.pointerLockCooldown) {
+                console.log("Pointer lock request on cooldown");
+                return false;
+            }
+            
+            // Check if already locked
+            if (document.pointerLockElement === document.body) {
+                console.log("Pointer lock already active");
+                return true;
+            }
+            
+            // Check if dialogue is active
+            if (this.dialogueLocked) {
+                console.log("Cannot lock pointer during dialogue");
+                return false;
+            }
+            
+            // Check if controls are available
+            if (!this.controls || typeof this.controls.lock !== 'function') {
+                console.log("Controls not available for pointer lock");
+                return false;
+            }
+            
+            // Prevent rapid requests
+            if (now - this.lastPointerLockRequest < 500) {
+                console.log("Too soon since last pointer lock request");
+                return false;
+            }
+            
+            try {
+                console.log("Requesting pointer lock...");
+                this.lastPointerLockRequest = now;
+                this.controls.lock();
+                return true;
+            } catch (error) {
+                console.warn("Pointer lock request failed:", error);
+                this.pointerLockCooldown = now + 2000; // 2 second cooldown on error
+                return false;
+            }
+        };
+        
+        // Handle click events for pointer lock
         document.addEventListener('click', (event) => {
-            // Only request pointer lock if not already locked and game is active
-            if (!this.dialogueLocked && this.controls && document.pointerLockElement !== document.body) {
-                // Add a small delay to avoid security errors
+            // Only try to lock if game is active and not in dialogue
+            if (!this.dialogueLocked && document.pointerLockElement !== document.body) {
+                // Add delay to ensure click event is complete
                 setTimeout(() => {
-                    if (this.controls && typeof this.controls.lock === 'function') {
-                        try {
-                            this.controls.lock();
-                        } catch (error) {
-                            console.warn("Could not acquire pointer lock:", error);
-                        }
-                    }
+                    requestPointerLockSafely();
                 }, 100);
             }
         });
         
-        // KEYBOARD INPUT HANDLERS - Simplified and more reliable
+        // Add a specific game area click handler
+        const gameContainer = document.getElementById('game-container');
+        if (gameContainer) {
+            gameContainer.addEventListener('click', (event) => {
+                if (!this.dialogueLocked) {
+                    setTimeout(() => {
+                        requestPointerLockSafely();
+                    }, 150);
+                }
+            });
+        }
+        
+        // KEYBOARD INPUT HANDLERS
         
         // Handle key down events
         document.addEventListener('keydown', (event) => {
             if (!this.alive) return;
             
             // Don't process movement if dialogue is active (except weapon controls)
-            if (this.dialogueLocked && !['KeyE', 'Tab', 'KeyR'].includes(event.code)) {
+            if (this.dialogueLocked && !['KeyE', 'Tab', 'KeyR', 'Escape'].includes(event.code)) {
                 return;
             }
             
             switch(event.code) {
                 case 'KeyW':
                 case 'ArrowUp':
-                    if (!this.dialogueLocked) this.keys.forward = true;
+                    if (!this.dialogueLocked) {
+                        this.keys.forward = true;
+                        // Auto-request pointer lock when starting to move
+                        if (!document.pointerLockElement) {
+                            setTimeout(() => requestPointerLockSafely(), 100);
+                        }
+                    }
                     event.preventDefault();
                     break;
                 case 'KeyS':
@@ -238,27 +310,52 @@ class Player {
                     this.handleInteraction();
                     event.preventDefault();
                     break;
-                // Weapon controls work even during dialogue for emergency situations
+                case 'Escape':
+                    // Release pointer lock on Escape
+                    if (document.pointerLockElement === document.body) {
+                        document.exitPointerLock();
+                    }
+                    event.preventDefault();
+                    break;
                 case 'Tab':
-                    // Weapon toggle handled by weapon class
+                    // Toggle weapon - FIX: Make sure this works properly
+                    if (this.weapon) {
+                        console.log(`Current weapon state: ${this.weapon.isEquipped ? 'equipped' : 'holstered'}`);
+                        if (this.weapon.isEquipped) {
+                            this.weapon.holster();
+                            console.log("Weapon holstered via Tab key");
+                        } else {
+                            this.weapon.equip();
+                            console.log("Weapon equipped via Tab key");
+                        }
+                    } else {
+                        console.log("No weapon available to toggle");
+                    }
                     event.preventDefault();
                     break;
                 case 'KeyR':
-                    // Reload handled by weapon class
+                    // Reload weapon
+                    if (this.weapon && this.weapon.isEquipped) {
+                        this.weapon.reload();
+                    }
                     event.preventDefault();
                     break;
             }
             
             if (this.debug && event.code === 'KeyP') {
                 // Debug key
-                console.log("Player position:", this.body.position);
-                console.log("Player velocity:", this.body.velocity);
+                console.log("=== PLAYER DEBUG INFO ===");
+                console.log("Position:", this.body.position);
+                console.log("Velocity:", this.body.velocity);
                 console.log("Movement states:", this.keys);
                 console.log("On ground:", this.onGround);
+                console.log("Pointer lock:", document.pointerLockElement === document.body);
+                console.log("Controls locked:", this.controls.isLocked);
                 if (this.weapon) {
                     console.log("Weapon equipped:", this.weapon.isEquipped);
-                    console.log("Weapon ammo:", this.weapon.ammo);
+                    console.log("Weapon ammo:", this.weapon.currentAmmo + "/" + this.weapon.maxAmmo);
                 }
+                console.log("========================");
             }
         });
         
@@ -291,25 +388,23 @@ class Player {
                 case 'KeyE':
                     this.keys.interact = false;
                     break;
+                // Don't handle Tab in keyup to avoid conflicts
             }
         });
         
-        // Handle pointer lock for camera control
-        document.addEventListener('click', () => {
-            if (document.pointerLockElement !== document.body && this.controls && !this.dialogueLocked) {
-                this.controls.lock();
+        // Handle mouse events for weapon firing
+        document.addEventListener('mousedown', (event) => {
+            if (event.button === 0 && this.weapon && this.weapon.isEquipped && document.pointerLockElement === document.body) {
+                // Left click to fire
+                this.weapon.fire();
             }
         });
         
-        // Listen for pointer lock changes
-        document.addEventListener('pointerlockchange', () => {
-            console.log("Pointer lock state changed:", document.pointerLockElement === document.body ? "locked" : "unlocked");
-        });
-        
+        // Show helpful messages
         console.log("Input handlers initialized");
         console.log("Controls: W/A/S/D to move, Space to jump, Shift to sprint, E to interact");
         console.log("Weapon Controls: Tab to equip/holster, Left Click to shoot, R to reload");
-        console.log("Click anywhere to enable mouse look");
+        console.log("Click in the game area to enable mouse look (Escape to release)");
     }
     
     handleInteraction() {

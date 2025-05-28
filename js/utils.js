@@ -171,8 +171,8 @@ const Utils = {
         }
     },
     
-    class Utils {
-    static createCharacterPhysics(world, position, scale = 1) {
+    // Character physics utilities
+    createCharacterPhysics: function(world, position, scale = 1) {
         try {
             // Create main body for character torso
             const torsoShape = new CANNON.Cylinder(0.3 * scale, 0.3 * scale, 1.2 * scale, 8);
@@ -201,9 +201,9 @@ const Utils = {
             console.error("Error creating character physics:", error);
             return null;
         }
-    }
+    },
 
-    static createLegCollisionBodies(world, position, scale = 1) {
+    createLegCollisionBodies: function(world, position, scale = 1) {
         try {
             const legBodies = [];
             
@@ -221,7 +221,7 @@ const Utils = {
             leftLegBody.position.set(position.x - 0.25 * scale, position.y - 0.2 * scale, position.z);
             world.addBody(leftLegBody);
             legBodies.push(leftLegBody);
-
+            
             // Right leg
             const rightLegShape = new CANNON.Cylinder(0.12 * scale, 0.15 * scale, 1.0 * scale, 8);
             const rightLegBody = new CANNON.Body({
@@ -236,8 +236,8 @@ const Utils = {
             rightLegBody.position.set(position.x + 0.25 * scale, position.y - 0.2 * scale, position.z);
             world.addBody(rightLegBody);
             legBodies.push(rightLegBody);
-
-            // Feet for extra stability
+            
+            // Add foot bodies
             const footBodies = this.createFootBodies(world, position, scale);
             legBodies.push(...footBodies);
 
@@ -246,12 +246,12 @@ const Utils = {
             console.error("Error creating leg collision bodies:", error);
             return [];
         }
-    }
+    },
 
-    static createFootBodies(world, position, scale = 1) {
+    createFootBodies: function(world, position, scale = 1) {
         try {
             const footBodies = [];
-
+            
             // Left foot
             const leftFootShape = new CANNON.Box(new CANNON.Vec3(0.15 * scale, 0.05 * scale, 0.25 * scale));
             const leftFootBody = new CANNON.Body({
@@ -266,7 +266,7 @@ const Utils = {
             leftFootBody.position.set(position.x - 0.25 * scale, position.y - 0.7 * scale, position.z);
             world.addBody(leftFootBody);
             footBodies.push(leftFootBody);
-
+            
             // Right foot
             const rightFootShape = new CANNON.Box(new CANNON.Vec3(0.15 * scale, 0.05 * scale, 0.25 * scale));
             const rightFootBody = new CANNON.Body({
@@ -287,68 +287,9 @@ const Utils = {
             console.error("Error creating foot bodies:", error);
             return [];
         }
-    }
+    },
 
-    static updateCharacterPhysics(physicsData, targetPosition, delta) {
-        try {
-            if (!physicsData || !physicsData.mainBody) return;
-
-            const { mainBody, legBodies, scale } = physicsData;
-
-            // Update leg positions to follow main body
-            if (legBodies && legBodies.length >= 2) {
-                // Left leg
-                legBodies[0].position.set(
-                    mainBody.position.x - 0.25 * scale,
-                    mainBody.position.y - 0.8 * scale,
-                    mainBody.position.z
-                );
-                legBodies[0].quaternion.copy(mainBody.quaternion);
-
-                // Right leg
-                legBodies[1].position.set(
-                    mainBody.position.x + 0.25 * scale,
-                    mainBody.position.y - 0.8 * scale,
-                    mainBody.position.z
-                );
-                legBodies[1].quaternion.copy(mainBody.quaternion);
-
-                // Update feet if they exist
-                if (legBodies.length >= 4) {
-                    // Left foot
-                    legBodies[2].position.set(
-                        mainBody.position.x - 0.25 * scale,
-                        mainBody.position.y - 1.35 * scale,
-                        mainBody.position.z
-                    );
-                    legBodies[2].quaternion.copy(mainBody.quaternion);
-
-                    // Right foot
-                    legBodies[3].position.set(
-                        mainBody.position.x + 0.25 * scale,
-                        mainBody.position.y - 1.35 * scale,
-                        mainBody.position.z
-                    );
-                    legBodies[3].quaternion.copy(mainBody.quaternion);
-                }
-            }
-
-            // Prevent excessive vertical velocity for stability
-            if (Math.abs(mainBody.velocity.y) > 20) {
-                mainBody.velocity.y = Math.sign(mainBody.velocity.y) * 20;
-            }
-
-            // Ground contact stabilization
-            if (mainBody.position.y < 1.0 * scale && mainBody.velocity.y < 0) {
-                mainBody.position.y = 1.0 * scale;
-                mainBody.velocity.y = 0;
-            }
-        } catch (error) {
-            console.error("Error updating character physics:", error);
-        }
-    }
-
-    static cleanupCharacterPhysics(world, physicsData) {
+    cleanupCharacterPhysics: function(world, physicsData) {
         try {
             if (!physicsData || !world) return;
 
@@ -364,37 +305,37 @@ const Utils = {
         } catch (error) {
             console.error("Error cleaning up character physics:", error);
         }
-    }
+    },
 
-    static getRandomPosition(bounds) {
+    getRandomPosition: function(bounds) {
         return {
             x: (Math.random() - 0.5) * bounds.width,
             y: 0,
             z: (Math.random() - 0.5) * bounds.depth
         };
-    }
+    },
 
-    static calculateDistance(pos1, pos2) {
+    calculateDistance: function(pos1, pos2) {
         return Math.sqrt(
             Math.pow(pos1.x - pos2.x, 2) +
             Math.pow(pos1.y - pos2.y, 2) +
             Math.pow(pos1.z - pos2.z, 2)
         );
-    }
+    },
 
-    static clamp(value, min, max) {
+    clamp: function(value, min, max) {
         return Math.min(Math.max(value, min), max);
-    }
+    },
 
-    static lerp(a, b, t) {
+    lerp: function(a, b, t) {
         return a + (b - a) * t;
-    }
+    },
 
-    static randomChoice(array) {
+    randomChoice: function(array) {
         return array[Math.floor(Math.random() * array.length)];
-    }
+    },
 
-    static createMaterial(color, options = {}) {
+    createMaterial: function(color, options = {}) {
         return new THREE.MeshStandardMaterial({
             color: color,
             metalness: options.metalness || 0.1,
@@ -403,7 +344,7 @@ const Utils = {
             opacity: options.opacity || 1.0
         });
     }
-}
+};
 
 window.Utils = Utils;
-console.log("Utils class loaded with character physics");
+console.log("Utils object loaded with character physics");

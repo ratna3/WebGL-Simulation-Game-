@@ -475,6 +475,9 @@
                 // Hide loading screen right away for better UX
                 document.getElementById('loading-screen').style.display = 'none';
                 
+                // Show pointer lock instructions
+                showPointerLockInstructions();
+                
                 if (window.game && typeof window.game.startGame === 'function') {
                     debugLog("Calling game.startGame()");
                     window.game.startGame();
@@ -487,16 +490,51 @@
             }
         }
         
-        // Manually trigger pointer lock
-        function requestPointerLock() {
-            debugLog("Requesting pointer lock");
+        // Show instructions for pointer lock
+        function showPointerLockInstructions() {
+            const instructions = document.createElement('div');
+            instructions.id = 'pointer-lock-instructions';
+            instructions.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.9);
+                color: white;
+                padding: 30px;
+                border-radius: 10px;
+                border: 2px solid #ff3e3e;
+                text-align: center;
+                z-index: 300;
+                font-family: 'Courier New', monospace;
+                max-width: 500px;
+            `;
             
-            document.body.requestPointerLock = 
-                document.body.requestPointerLock || 
-                document.body.mozRequestPointerLock || 
-                document.body.webkitRequestPointerLock;
-                
-            document.body.requestPointerLock();
+            instructions.innerHTML = `
+                <h2 style="color: #ff3e3e; margin-bottom: 20px;">Ready to Start Mission</h2>
+                <p style="margin-bottom: 20px;">
+                    Click anywhere in the game area to enable mouse look.<br>
+                    Press <strong>Escape</strong> to release mouse at any time.
+                </p>
+                <p style="margin-bottom: 20px; color: #ccc; font-size: 14px;">
+                    Move with <strong>WASD</strong>, interact with <strong>E</strong><br>
+                    Toggle weapon with <strong>Tab</strong>, shoot with <strong>Left Click</strong>
+                </p>
+                <button onclick="this.parentElement.remove()" 
+                        style="background: #ff3e3e; color: white; border: none; padding: 10px 20px; 
+                               border-radius: 5px; cursor: pointer;">
+                    Got it!
+                </button>
+            `;
+            
+            document.body.appendChild(instructions);
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+                if (instructions.parentElement) {
+                    instructions.remove();
+                }
+            }, 10000);
         }
         
         // Agent naming functionality
@@ -594,6 +632,7 @@
                 'js/buildings/buildingSystem.js',
                 'js/design/characterDesign.js',
                 'js/city/cityGenerator.js',
+                'js/effects/bulletSystem.js',      // Load bullet system early
                 'js/game/missionManager.js',
                 'js/environment.js',
                 'js/dialogue.js',
@@ -611,13 +650,29 @@
                     debugLog("All game scripts loaded successfully");
                     
                     // Verify critical classes are loaded
-                    const requiredClasses = ['NPCManager', 'Player', 'Weapon', 'MissionManager'];
+                    const requiredClasses = ['NPCManager', 'Player', 'Weapon', 'MissionManager', 'BulletSystem'];
                     const missingClasses = requiredClasses.filter(className => typeof window[className] === 'undefined');
                     
                     if (missingClasses.length > 0) {
                         console.error("Missing required classes:", missingClasses);
                         showError(`Missing required game classes: ${missingClasses.join(', ')}`);
                         return;
+                    }
+                    
+                    // Test bullet system specifically
+                    try {
+                        if (typeof BulletSystem !== 'undefined') {
+                            console.log("BulletSystem class available");
+                            // Test instantiation
+                            const testScene = new THREE.Scene();
+                            const testWorld = new CANNON.World();
+                            const testBulletSystem = new BulletSystem(testScene, testWorld);
+                            console.log("BulletSystem test instance created successfully");
+                        } else {
+                            console.error("BulletSystem class not available after loading scripts");
+                        }
+                    } catch (bulletTestError) {
+                        console.error("BulletSystem test failed:", bulletTestError);
                     }
                     
                     // Test texture system after all scripts are loaded
@@ -695,39 +750,113 @@
             // Initialize debug tools
             document.getElementById('debug-info').innerHTML = "<h3>Debug Log</h3>";
             
+            // Add pointer lock status indicator
+            const statusIndicator = document.createElement('div');
+            statusIndicator.id = 'pointer-lock-status';
+            statusIndicator.style.cssText = `
+                position: fixed;
+                top: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 8px 15px;
+                border-radius: 5px;
+                font-family: monospace;
+                font-size: 12px;
+                z-index: 200;
+                display: none;
+            `;
+            statusIndicator.textContent = "Click in game area to enable mouse look";
+            document.body.appendChild(statusIndicator);
+            
+            // Monitor pointer lock status
+            function updatePointerLockStatus() {
+                const isLocked = document.pointerLockElement === document.body;
+                statusIndicator.style.display = isLocked ? 'none' : 'block';
+                statusIndicator.textContent = isLocked ? 
+                    "Mouse look active (ESC to release)" : 
+                    "Click in game area to enable mouse look";
+            }
+            
+            document.addEventListener('pointerlockchange', updatePointerLockStatus);
+            document.addEventListener('mozpointerlockchange', updatePointerLockStatus);
+            document.addEventListener('webkitpointerlockchange', updatePointerLockStatus);
+            
             // Don't start loading scripts automatically - wait for agent name confirmation
             debugLog("Waiting for agent name confirmation...");
         });
     </script>
     
-    <!-- Add this at the bottom of your body tag, right before the closing </body> tag -->
+    <!-- Replace the debug button with a better version -->
     <script>
-        // Add a debug button to re-trigger pointer lock if needed
+        // Add improved debug controls
         window.addEventListener('DOMContentLoaded', () => {
-            const debugButton = document.createElement('button');
-            debugButton.style.position = 'fixed';
-            debugButton.style.bottom = '10px';
-            debugButton.style.left = '10px';
-            debugButton.style.zIndex = '1000';
-            debugButton.style.padding = '8px';
-            debugButton.style.backgroundColor = '#333';
-            debugButton.style.color = 'white';
-            debugButton.textContent = 'Restart Controls';
+            const debugPanel = document.createElement('div');
+            debugPanel.style.cssText = `
+                position: fixed;
+                bottom: 10px;
+                left: 10px;
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 10px;
+                border-radius: 5px;
+                font-family: monospace;
+                font-size: 12px;
+                z-index: 1000;
+                display: none;
+            `;
             
-            debugButton.addEventListener('click', () => {
-                if (window.player && window.player.controls) {
-                    window.player.controls.lock();
-                    console.log("Manual pointer lock requested");
-                } else if (window.playerInstance && window.playerInstance.controls) {
-                    window.playerInstance.controls.lock();
-                    console.log("Manual pointer lock requested via playerInstance");
+            debugPanel.innerHTML = `
+                <div style="margin-bottom: 10px;">Debug Controls:</div>
+                <button onclick="window.debugRequestPointerLock()" style="margin: 2px; padding: 5px; background: #333; color: white; border: 1px solid #666; border-radius: 3px; cursor: pointer;">
+                    Request Mouse Lock
+                </button>
+                <button onclick="document.exitPointerLock()" style="margin: 2px; padding: 5px; background: #333; color: white; border: 1px solid #666; border-radius: 3px; cursor: pointer;">
+                    Release Mouse Lock
+                </button>
+                <button onclick="window.debugPlayerInfo()" style="margin: 2px; padding: 5px; background: #333; color: white; border: 1px solid #666; border-radius: 3px; cursor: pointer;">
+                    Player Info
+                </button>
+            `;
+            
+            document.body.appendChild(debugPanel);
+            
+            // Debug functions
+            window.debugRequestPointerLock = () => {
+                if (window.playerInstance && window.playerInstance.controls) {
+                    try {
+                        window.playerInstance.controls.lock();
+                        console.log("Debug: Pointer lock requested");
+                    } catch (error) {
+                        console.error("Debug: Pointer lock failed:", error);
+                    }
                 } else {
-                    console.error("Player controls not available");
-                    alert("Please start the game first");
+                    console.error("Debug: Player not available");
+                }
+            };
+            
+            window.debugPlayerInfo = () => {
+                if (window.playerInstance) {
+                    console.log("=== DEBUG PLAYER INFO ===");
+                    console.log("Player position:", window.playerInstance.body?.position);
+                    console.log("Player alive:", window.playerInstance.alive);
+                    console.log("Dialogue locked:", window.playerInstance.dialogueLocked);
+                    console.log("Pointer locked:", document.pointerLockElement === document.body);
+                    console.log("Controls available:", !!window.playerInstance.controls);
+                    console.log("========================");
+                } else {
+                    console.log("Player not available yet");
+                }
+            };
+            
+            // Toggle debug panel with Ctrl+D
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'KeyD' && e.ctrlKey) {
+                    debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+                    e.preventDefault();
                 }
             });
-            
-            document.body.appendChild(debugButton);
         });
     </script>
 </body>
