@@ -25,7 +25,13 @@ class EnemyAnimationManager {
         };
         
         this.animations.set(enemy, animationData);
-        console.log("Enemy registered for animations");
+        
+        // Create health bar for enemy
+        if (enemy.isEnemy && typeof enemy.createHealthBar === 'function') {
+            enemy.createHealthBar();
+        }
+        
+        console.log("Enemy registered for animations with health bar");
     }
     
     saveOriginalPositions(enemy) {
@@ -124,6 +130,11 @@ class EnemyAnimationManager {
             
             if (animData.isShooting) {
                 this.updateShootAnimation(enemy, animData, delta);
+            }
+            
+            // Update health bar visibility for enemies
+            if (enemy.isEnemy && typeof enemy.checkHealthBarVisibility === 'function') {
+                enemy.checkHealthBarVisibility();
             }
         });
         
@@ -252,11 +263,15 @@ class EnemyAnimationManager {
             }
         }
         
-        // Color fade to gray
+        // Color fade to gray with null checks
         enemy.group.traverse((child) => {
             if (child.material && child.material.color) {
-                const grayValue = 1 - (progress * 0.7);
-                child.material.color.setRGB(grayValue, grayValue, grayValue);
+                try {
+                    const grayValue = 1 - (progress * 0.7);
+                    child.material.color.setRGB(grayValue, grayValue, grayValue);
+                } catch (error) {
+                    console.warn("Error applying death color fade:", error);
+                }
             }
         });
     }
@@ -399,28 +414,32 @@ class EnemyAnimationManager {
     createEnhancedMuzzleFlash(enemy) {
         if (!enemy.weaponGroup || !enemy.scene) return;
         
-        // Create larger, more realistic muzzle flash
+        // Create larger, more realistic muzzle flash using MeshStandardMaterial
         const flashGeometry = new THREE.SphereGeometry(0.15, 8, 6);
-        const flashMaterial = new THREE.MeshBasicMaterial({
+        const flashMaterial = new THREE.MeshStandardMaterial({
             color: 0xFFFF44,
             emissive: 0xFFAA00,
             emissiveIntensity: 2.0,
             transparent: true,
-            opacity: 0.9
+            opacity: 0.9,
+            metalness: 0.0,
+            roughness: 0.0
         });
         
         const flash = new THREE.Mesh(flashGeometry, flashMaterial);
         flash.position.set(0.4, 0, 0); // At barrel tip
         enemy.weaponGroup.add(flash);
         
-        // Create flame cone
+        // Create flame cone using MeshStandardMaterial
         const coneGeometry = new THREE.ConeGeometry(0.08, 0.2, 8);
-        const coneMaterial = new THREE.MeshBasicMaterial({
+        const coneMaterial = new THREE.MeshStandardMaterial({
             color: 0xFFAA44,
             emissive: 0xFF6600,
             emissiveIntensity: 1.5,
             transparent: true,
-            opacity: 0.7
+            opacity: 0.7,
+            metalness: 0.0,
+            roughness: 0.0
         });
         
         const cone = new THREE.Mesh(coneGeometry, coneMaterial);
@@ -438,7 +457,9 @@ class EnemyAnimationManager {
                 clearInterval(fadeInterval);
             } else {
                 flash.material.opacity = intensity;
+                flash.material.emissiveIntensity = intensity * 2;
                 cone.material.opacity = intensity * 0.7;
+                cone.material.emissiveIntensity = intensity * 1.5;
                 flash.scale.setScalar(1 + (1 - intensity) * 0.5);
             }
         }, 20);

@@ -343,6 +343,29 @@ const Utils = {
             transparent: options.transparent || false,
             opacity: options.opacity || 1.0
         });
+    },
+    
+    // Add specialized material creation for effects
+    createEmissiveMaterial: function(color, emissiveColor, options = {}) {
+        return new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: emissiveColor || color,
+            emissiveIntensity: options.emissiveIntensity || 1.0,
+            metalness: options.metalness || 0.0,
+            roughness: options.roughness || 0.0,
+            transparent: options.transparent || false,
+            opacity: options.opacity || 1.0
+        });
+    },
+    
+    // Create basic material without emissive properties
+    createBasicMaterial: function(color, options = {}) {
+        return new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: options.transparent || false,
+            opacity: options.opacity || 1.0,
+            side: options.side || THREE.FrontSide
+        });
     }
 };
 

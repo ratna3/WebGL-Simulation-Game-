@@ -341,7 +341,7 @@ class Weapon {
     }
     
     performRaycast() {
-        // Fallback raycast implementation with exact damage
+        // Enhanced raycast implementation with better hit detection
         try {
             const raycaster = new THREE.Raycaster();
             const direction = new THREE.Vector3();
@@ -355,13 +355,15 @@ class Weapon {
                 const intersections = [];
                 
                 targets.forEach(target => {
-                    if (target.group) {
+                    if (target.group && !target.isDead) {
+                        // Check intersection with entire group (any part of body)
                         const targetIntersects = raycaster.intersectObject(target.group, true);
                         if (targetIntersects.length > 0) {
                             intersections.push({
                                 object: target,
                                 distance: targetIntersects[0].distance,
-                                point: targetIntersects[0].point
+                                point: targetIntersects[0].point,
+                                hitPart: targetIntersects[0].object.name || 'body'
                             });
                         }
                     }
@@ -370,35 +372,137 @@ class Weapon {
                 // Sort by distance and hit the closest
                 if (intersections.length > 0) {
                     intersections.sort((a, b) => a.distance - b.distance);
-                    const target = intersections[0].object;
+                    const hit = intersections[0];
                     
-                    if (typeof target.takeDamage === 'function') {
-                        console.log(`Raycast hit with EXACTLY ${this.damage} damage`);
-                        target.takeDamage(this.damage); // Use exact weapon damage
-                        console.log("Raycast hit target!");
+                    console.log(`=== RAYCAST HIT ===`);
+                    console.log(`Target: ${hit.object.name || 'Unknown'}`);
+                    console.log(`Hit part: ${hit.hitPart}`);
+                    console.log(`Distance: ${hit.distance.toFixed(2)}`);
+                    console.log(`==================`);
+                    
+                    // Deal damage - 40 for all hits regardless of body part
+                    if (typeof hit.object.takeDamage === 'function') {
+                        const killed = hit.object.takeDamage(40);
+                        
+                        // Create hit effect at impact point
+                        this.createHitEffect(hit.point);
+                        
+                        // Show damage number
+                        this.showDamageNumber(hit.point, 40);
+                        
+                        if (killed) {
+                            console.log(`${hit.object.name} eliminated!`);
+                        }
+                        
+                        return true; // Hit confirmed
                     }
                 }
             }
+            
+            return false; // No hit
         } catch (error) {
-            console.error("Error performing raycast:", error);
+            console.error("Raycast error:", error);
+            return false;
         }
+    }
+    
+    createHitEffect(position) {
+        if (!window.game || !window.game.scene) return;
+        
+        // Create blood splash effect
+        const splashGeometry = new THREE.SphereGeometry(0.1, 8, 6);
+        const splashMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff0000,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const splash = new THREE.Mesh(splashGeometry, splashMaterial);
+        splash.position.copy(position);
+        window.game.scene.add(splash);
+        
+        // Animate splash
+        let scale = 0.1;
+        let opacity = 0.8;
+        const animate = () => {
+            scale += 0.05;
+            opacity -= 0.04;
+            
+            splash.scale.setScalar(scale);
+            splash.material.opacity = opacity;
+            
+            if (opacity <= 0) {
+                window.game.scene.remove(splash);
+            } else {
+                requestAnimationFrame(animate);
+            }
+        };
+        animate();
+    }
+    
+    showDamageNumber(position, damage) {
+        if (!window.game || !window.game.scene) return;
+        
+        // Create floating damage text
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 64;
+        const context = canvas.getContext('2d');
+        
+        context.fillStyle = '#ff0000';
+        context.font = 'bold 32px Arial';
+        context.textAlign = 'center';
+        context.fillText(`-${damage}`, 64, 40);
+        
+        const texture = new THREE.Texture(canvas);
+        texture.needsUpdate = true;
+        
+        const material = new THREE.SpriteMaterial({ 
+            map: texture,
+            transparent: true
+        });
+        
+        const sprite = new THREE.Sprite(material);
+        sprite.position.copy(position);
+        sprite.position.y += 0.5;
+        sprite.scale.set(2, 1, 1);
+        
+        window.game.scene.add(sprite);
+        
+        // Animate damage number
+        let startY = sprite.position.y;
+        let opacity = 1;
+        const animateDamage = () => {
+            sprite.position.y += 0.03;
+            opacity -= 0.02;
+            sprite.material.opacity = opacity;
+            
+            if (opacity <= 0) {
+                window.game.scene.remove(sprite);
+            } else {
+                requestAnimationFrame(animateDamage);
+            }
+        };
+        animateDamage();
     }
     
     createMuzzleFlash() {
         try {
             // Remove existing muzzle flash
-            if (this.muzzleFlash) {
-                this.weaponModel.remove(this.muzzleFlash);
+            if (this.muzzleFlash && this.muzzleFlash.parent) {
+                this.muzzleFlash.parent.remove(this.muzzleFlash);
             }
             
-            // Create bright spherical muzzle flash
+            // Create bright spherical muzzle flash using MeshStandardMaterial
             const flashGeometry = new THREE.SphereGeometry(0.03, 8, 8);
-            const flashMaterial = new THREE.MeshBasicMaterial({
+            const flashMaterial = new THREE.MeshStandardMaterial({
                 color: 0xFFFFFF,
                 emissive: 0xFFFF00,
                 emissiveIntensity: 2.0,
                 transparent: true,
-                opacity: 1.0
+                opacity: 1.0,
+                metalness: 0.0,
+                roughness: 0.0
             });
             
             this.muzzleFlash = new THREE.Mesh(flashGeometry, flashMaterial);
@@ -413,19 +517,29 @@ class Weapon {
                 this.weaponModel.add(this.muzzleFlash);
             }
             
-            // Animate muzzle flash
+            // Animate muzzle flash with null checks
             let flashIntensity = 2.0;
             const flashInterval = setInterval(() => {
                 flashIntensity -= 0.3;
                 if (flashIntensity <= 0) {
-                    if (this.muzzleFlash) {
-                        this.muzzleFlash.parent.remove(this.muzzleFlash);
-                        this.muzzleFlash = null;
+                    if (this.muzzleFlash && this.muzzleFlash.parent) {
+                        try {
+                            this.muzzleFlash.parent.remove(this.muzzleFlash);
+                            this.muzzleFlash = null;
+                        } catch (error) {
+                            console.warn("Error removing muzzle flash:", error);
+                        }
                     }
                     clearInterval(flashInterval);
                 } else {
-                    this.muzzleFlash.material.emissiveIntensity = flashIntensity;
-                    this.muzzleFlash.material.opacity = flashIntensity / 2;
+                    if (this.muzzleFlash && this.muzzleFlash.material) {
+                        try {
+                            this.muzzleFlash.material.emissiveIntensity = flashIntensity;
+                            this.muzzleFlash.material.opacity = flashIntensity / 2;
+                        } catch (error) {
+                            console.warn("Error updating muzzle flash:", error);
+                        }
+                    }
                 }
             }, 15);
             
@@ -485,15 +599,19 @@ class Weapon {
         }
     }
     
-    // Add method to force weapon visibility
+    // Add method to force weapon visibility with null checks
     forceVisible() {
         if (this.weaponGroup) {
             this.weaponGroup.visible = true;
             this.weaponGroup.traverse((child) => {
-                if (child.isMesh) {
-                    child.visible = true;
-                    child.material.transparent = false;
-                    child.material.opacity = 1.0;
+                if (child.isMesh && child.material) {
+                    try {
+                        child.visible = true;
+                        child.material.transparent = false;
+                        child.material.opacity = 1.0;
+                    } catch (error) {
+                        console.warn("Error forcing weapon visibility:", error);
+                    }
                 }
             });
             console.log("Forced weapon visibility");

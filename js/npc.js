@@ -42,10 +42,58 @@ class NPC {
     }
     
     createCharacter() {
-        // Use the character design system
-        this.group = this.characterDesign.createNPCCharacter(this.type);
+        try {
+            // Use the character design system
+            this.group = this.characterDesign.createNPCCharacter(this.type);
+            this.group.position.set(this.position.x, this.position.y, this.position.z);
+            this.mesh = this.group;
+            
+            // Ensure all facial features are visible
+            this.group.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    child.visible = true;
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    
+                    // Ensure materials are properly set
+                    if (child.material) {
+                        child.material.needsUpdate = true;
+                    }
+                }
+            });
+            
+            console.log(`${this.type} NPC character created with facial features:`, this.name);
+        } catch (error) {
+            console.error("Error creating NPC character:", error);
+            // Fallback to simple character if detailed creation fails
+            this.createSimpleFallbackCharacter();
+        }
+    }
+    
+    createSimpleFallbackCharacter() {
+        // Simple fallback character in case detailed creation fails
+        this.group = new THREE.Group();
+        
+        // Simple body
+        const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 1.5, 8);
+        const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x4A5568 });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 0.75;
+        body.castShadow = true;
+        this.group.add(body);
+        
+        // Simple head
+        const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
+        const headMaterial = new THREE.MeshStandardMaterial({ color: 0xDDB592 });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = 1.7;
+        head.castShadow = true;
+        this.group.add(head);
+        
         this.group.position.set(this.position.x, this.position.y, this.position.z);
         this.mesh = this.group;
+        
+        console.log(`Created fallback character for ${this.name}`);
     }
     
     addConeLegs() {
@@ -149,6 +197,9 @@ class NPC {
         if (this.dialogueCooldown > 0) {
             this.dialogueCooldown -= delta * 1000;
         }
+        
+        // Update health bar visibility
+        this.checkHealthBarVisibility();
     }
     
     updateWalkingAnimation(delta) {
@@ -253,10 +304,14 @@ class NPC {
         this.isWalking = false; // Stop walking when hostile
         console.log(`${this.name} becomes hostile!`);
         
-        // Change appearance to show hostility (red tint)
+        // Change appearance to show hostility (red tint) with null checks
         this.group.traverse((child) => {
-            if (child.material) {
-                child.material.emissive = new THREE.Color(0x440000);
+            if (child.material && child.material.emissive) {
+                try {
+                    child.material.emissive = new THREE.Color(0x440000);
+                } catch (error) {
+                    console.warn("Error applying hostile effect:", error);
+                }
             }
         });
     }
@@ -267,15 +322,22 @@ class NPC {
         this.health -= damage;
         console.log(`${this.name} takes ${damage} damage. Health: ${this.health}/${this.maxHealth}`);
         
-        // Visual damage effect
+        // Update health bar immediately
+        this.updateHealthBar();
+        
+        // Visual damage effect with null checks
         this.group.traverse((child) => {
             if (child.material && child.material.emissive) {
-                child.material.emissive.setHex(0x440000);
-                setTimeout(() => {
-                    if (!this.isDead) {
-                        child.material.emissive.setHex(0x000000);
-                    }
-                }, 200);
+                try {
+                    child.material.emissive.setHex(0x440000);
+                    setTimeout(() => {
+                        if (!this.isDead && child.material && child.material.emissive) {
+                            child.material.emissive.setHex(0x000000);
+                        }
+                    }, 200);
+                } catch (error) {
+                    console.warn("Error applying damage effect:", error);
+                }
             }
         });
         
@@ -292,6 +354,117 @@ class NPC {
         return false; // Still alive
     }
     
+    createHealthBar() {
+        if (!this.isEnemy || this.healthBarGroup) return;
+        
+        // Create health bar container
+        this.healthBarGroup = new THREE.Group();
+        
+        // Background bar (red)
+        const bgGeometry = new THREE.PlaneGeometry(1.2, 0.15);
+        const bgMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x441111,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide
+        });
+        this.healthBarBg = new THREE.Mesh(bgGeometry, bgMaterial);
+        this.healthBarGroup.add(this.healthBarBg);
+        
+        // Health bar (green to red gradient)
+        const healthGeometry = new THREE.PlaneGeometry(1.0, 0.1);
+        const healthMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x44ff44,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide
+        });
+        this.healthBar = new THREE.Mesh(healthGeometry, healthMaterial);
+        this.healthBar.position.z = 0.001; // Slightly in front
+        this.healthBarGroup.add(this.healthBar);
+        
+        // Position health bar above enemy
+        this.healthBarGroup.position.set(0, 2.5, 0);
+        this.group.add(this.healthBarGroup);
+        
+        // Store original scale for visibility management
+        this.healthBarOriginalScale = this.healthBarGroup.scale.clone();
+        
+        console.log(`Health bar created for enemy: ${this.name}`);
+    }
+    
+    updateHealthBar() {
+        if (!this.healthBar || !this.isEnemy) return;
+        
+        const healthPercent = Math.max(0, this.health / this.maxHealth);
+        
+        // Update health bar width
+        this.healthBar.scale.x = healthPercent;
+        this.healthBar.position.x = -(1.0 - healthPercent) * 0.5; // Align to left
+        
+        // Update color based on health
+        if (healthPercent > 0.6) {
+            this.healthBar.material.color.setHex(0x44ff44); // Green
+        } else if (healthPercent > 0.3) {
+            this.healthBar.material.color.setHex(0xffff44); // Yellow
+        } else {
+            this.healthBar.material.color.setHex(0xff4444); // Red
+        }
+        
+        // Make health bar face camera
+        if (window.game && window.game.camera && this.healthBarGroup) {
+            this.healthBarGroup.lookAt(window.game.camera.position);
+        }
+    }
+    
+    checkHealthBarVisibility() {
+        if (!this.healthBarGroup || !this.isEnemy || this.isDead) return;
+        
+        // Check distance from player
+        if (window.game && window.game.player && window.game.player.body) {
+            const playerPos = window.game.player.body.position;
+            const enemyPos = this.body.position;
+            const distance = Math.sqrt(
+                Math.pow(playerPos.x - enemyPos.x, 2) + 
+                Math.pow(playerPos.z - enemyPos.z, 2)
+            );
+            
+            // Hide health bar if too far
+            if (distance > 50) {
+                this.healthBarGroup.visible = false;
+                return;
+            }
+        }
+        
+        // Check for nearby enemies to avoid overlapping health bars
+        let nearbyEnemyCount = 0;
+        const thisPos = this.body.position;
+        
+        if (window.game && window.game.npcManager) {
+            window.game.npcManager.enemies.forEach(enemy => {
+                if (enemy !== this && !enemy.isDead && enemy.body) {
+                    const otherPos = enemy.body.position;
+                    const distance = Math.sqrt(
+                        Math.pow(thisPos.x - otherPos.x, 2) + 
+                        Math.pow(thisPos.z - otherPos.z, 2)
+                    );
+                    
+                    if (distance < 3) { // Within 3 units
+                        nearbyEnemyCount++;
+                    }
+                }
+            });
+        }
+        
+        // Hide health bars if too many enemies are clustered
+        if (nearbyEnemyCount >= 2) {
+            this.healthBarGroup.visible = false;
+        } else {
+            this.healthBarGroup.visible = true;
+            this.healthBarGroup.scale.copy(this.healthBarOriginalScale);
+        }
+    }
+    
     die() {
         if (this.isDead) return;
         
@@ -299,24 +472,46 @@ class NPC {
         this.health = 0;
         console.log(`${this.name} has been eliminated!`);
         
+        // Hide health bar immediately
+        if (this.healthBarGroup) {
+            this.healthBarGroup.visible = false;
+        }
+        
         // Death animation - fall over
         this.group.rotation.z = Math.PI / 2;
         this.group.position.y -= 0.5;
         
-        // Change color to indicate death
+        // Change color to indicate death with proper null checks
         this.group.traverse((child) => {
-            if (child.material) {
-                child.material.color.multiplyScalar(0.3);
-                child.material.emissive.setHex(0x000000);
+            if (child.isMesh && child.material) {
+                try {
+                    if (child.material.color) {
+                        child.material.color.multiplyScalar(0.3);
+                    }
+                    if (child.material.emissive) {
+                        child.material.emissive.setHex(0x000000);
+                    }
+                } catch (error) {
+                    console.warn("Error applying death effect:", error);
+                }
             }
         });
         
         // Remove physics body
-        this.world.removeBody(this.body);
+        if (this.body && this.world) {
+            this.world.removeBody(this.body);
+        }
+        
+        // Notify mission manager if this was an enemy
+        if (this.isEnemy && window.game && window.game.missionManager) {
+            window.game.missionManager.enemyEliminated();
+        }
         
         // Remove from scene after a delay
         setTimeout(() => {
-            this.scene.remove(this.group);
+            if (this.scene && this.group && this.group.parent) {
+                this.scene.remove(this.group);
+            }
         }, 5000);
     }
     
@@ -344,6 +539,11 @@ class NPC {
                 console.log(`${this.name} attacks the player!`);
                 this.attackPlayer();
             }
+        }
+        
+        // Update health bar visibility during hostile behavior
+        if (this.isEnemy) {
+            this.checkHealthBarVisibility();
         }
     }
     
@@ -621,24 +821,40 @@ class Enemy {
         this.group.rotation.z = Math.PI / 2; // Fall over
         this.group.position.y -= 0.5;
         
-        // Change appearance
+        // Change appearance with proper null checks
         this.group.traverse((child) => {
             if (child.isMesh && child.material) {
-                child.material.color.multiplyScalar(0.5); // Darken
-                child.material.emissive.setHex(0x000000);
+                try {
+                    if (child.material.color) {
+                        child.material.color.multiplyScalar(0.5); // Darken
+                    }
+                    if (child.material.emissive) {
+                        child.material.emissive.setHex(0x000000);
+                    }
+                } catch (error) {
+                    console.warn("Error applying death visual effect:", error);
+                }
             }
         });
         
         // Remove physics body immediately to prevent further collisions
-        if (this.body) {
-            this.world.removeBody(this.body);
-            this.body = null;
+        if (this.body && this.world) {
+            try {
+                this.world.removeBody(this.body);
+                this.body = null;
+            } catch (error) {
+                console.warn("Error removing enemy physics body:", error);
+            }
         }
         
         // Remove from scene after delay
         setTimeout(() => {
             if (this.group && this.group.parent) {
-                this.scene.remove(this.group);
+                try {
+                    this.scene.remove(this.group);
+                } catch (error) {
+                    console.warn("Error removing enemy from scene:", error);
+                }
             }
         }, 5000);
         
@@ -657,6 +873,58 @@ class Enemy {
         );
     }
 
+    // Add missing methods for cover system integration
+    getPlayerCoverLevel() {
+        // Get player cover level from game's cover system
+        if (window.game && window.game.coverSystem) {
+            return window.game.coverSystem.getCoverLevel();
+        }
+        return 100; // Default to full cover if system not available
+    }
+    
+    calculateCoverDetection(playerCover, distanceToPlayer) {
+        // Calculate detection probability based on cover and distance
+        let detectionChance = 0;
+        
+        if (playerCover < 30) {
+            detectionChance = 0.9; // Very high chance when cover is very low
+        } else if (playerCover < 60) {
+            detectionChance = 0.6; // Moderate chance when cover is low
+        } else if (playerCover < 80) {
+            detectionChance = 0.3; // Low chance when cover is decent
+        } else {
+            detectionChance = 0.1; // Very low chance when cover is good
+        }
+        
+        // Adjust for distance
+        const maxDistance = this.detectionRange;
+        const distanceFactor = 1 - (distanceToPlayer / maxDistance);
+        detectionChance *= Math.max(0, distanceFactor);
+        
+        return detectionChance;
+    }
+    
+    alertNearbyEnemies() {
+        // Alert other enemies when player is detected
+        if (window.game && window.game.npcManager) {
+            window.game.npcManager.enemies.forEach(enemy => {
+                if (enemy !== this && !enemy.isDead) {
+                    const distance = Math.sqrt(
+                        Math.pow(this.body.position.x - enemy.body.position.x, 2) +
+                        Math.pow(this.body.position.z - enemy.body.position.z, 2)
+                    );
+                    
+                    if (distance < 20) { // Alert radius
+                        enemy.playerDetected = true;
+                        enemy.state = 'chase';
+                        enemy.suspicionLevel = enemy.maxSuspicion;
+                        console.log(`${enemy.name} alerted by ${this.name}`);
+                    }
+                }
+            });
+        }
+    }
+    
     updateAI(playerPosition, delta) {
         if (!playerPosition) return;
         
@@ -777,6 +1045,129 @@ class Enemy {
         
         if (window.game && window.game.playerTakeDamage) {
             window.game.playerTakeDamage(this.attackDamage);
+        }
+    }
+    
+    handlePatrolState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta, playerCover) {
+        // Enhanced patrol behavior with cover detection
+        const coverDetection = this.calculateCoverDetection(playerCover, distanceToPlayer);
+        
+        // Check if player detected based on distance and cover
+        if (distanceToPlayer < adjustedDetectionRange) {
+            if (Math.random() < coverDetection) {
+                this.playerDetected = true;
+                this.state = 'investigate';
+                this.suspicionLevel = Math.min(this.maxSuspicion, this.suspicionLevel + 25);
+                console.log(`${this.name} detects suspicious activity (Cover: ${playerCover}%)`);
+            } else if (playerCover < this.coverThreshold) {
+                // Even if not fully detected, become suspicious when cover is blown
+                this.suspicionLevel = Math.min(this.maxSuspicion, this.suspicionLevel + (20 * delta));
+                if (this.suspicionLevel > 50) {
+                    this.state = 'investigate';
+                    console.log(`${this.name} becomes suspicious due to blown cover`);
+                }
+            }
+        }
+        
+        // Continue patrol movement
+        this.updatePatrolMovement(delta);
+        this.isMoving = true;
+    }
+    
+    handleInvestigateState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta) {
+        // Investigation behavior
+        if (distanceToPlayer < adjustedDetectionRange * 0.7) {
+            // Player is close during investigation - become aggressive
+            this.playerDetected = true;
+            this.state = 'chase';
+            this.suspicionLevel = this.maxSuspicion;
+            console.log(`${this.name} confirms threat - engaging!`);
+            this.alertNearbyEnemies();
+        } else if (this.suspicionLevel < 20) {
+            // Suspicion has decreased, return to patrol
+            this.state = 'patrol';
+            console.log(`${this.name} returns to patrol`);
+        } else {
+            // Move towards last known player position
+            this.moveTowardsTarget(playerPosition, delta, this.patrolSpeed * 1.5);
+            this.isMoving = true;
+            
+            // Decrease suspicion slowly during investigation
+            this.suspicionLevel = Math.max(0, this.suspicionLevel - (10 * delta));
+        }
+    }
+    
+    updatePatrolMovement(delta) {
+        // Enhanced patrol movement with proper pathfinding
+        if (!this.patrolPoints || this.patrolPoints.length === 0) {
+            this.generatePatrolRoute();
+            return;
+        }
+        
+        const currentTarget = this.patrolPoints[this.currentPatrolIndex];
+        if (!currentTarget) return;
+        
+        const currentPos = this.body.position;
+        const distance = Math.sqrt(
+            Math.pow(currentTarget.x - currentPos.x, 2) +
+            Math.pow(currentTarget.z - currentPos.z, 2)
+        );
+        
+        if (distance < 2) {
+            // Reached patrol point, move to next one
+            this.currentPatrolIndex = (this.currentPatrolIndex + 1) % this.patrolPoints.length;
+            console.log(`${this.name} reached patrol point ${this.currentPatrolIndex}`);
+        } else {
+            // Move towards current patrol point
+            this.moveTowardsTarget(currentTarget, delta, this.patrolSpeed);
+        }
+    }
+    
+    moveTowardsTarget(target, delta, speed) {
+        if (!target || !this.body) return;
+        
+        const currentPos = this.body.position;
+        const direction = {
+            x: target.x - currentPos.x,
+            z: target.z - currentPos.z
+        };
+        
+        const distance = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
+        
+        if (distance > 0.1) {
+            // Normalize direction
+            direction.x /= distance;
+            direction.z /= distance;
+            
+            // Apply movement
+            this.body.velocity.x = direction.x * speed;
+            this.body.velocity.z = direction.z * speed;
+            
+            // Face movement direction
+            const angle = Math.atan2(direction.x, direction.z);
+            this.group.rotation.y = angle;
+        } else {
+            // Stop movement when close to target
+            this.body.velocity.x = 0;
+            this.body.velocity.z = 0;
+        }
+    }
+    
+    updateAnimations() {
+        // Update animation state based on current behavior
+        if (this.animationManager) {
+            let animationState = 'idle';
+            
+            if (this.isMoving) {
+                animationState = 'walking';
+            }
+            
+            // Only change animation if state actually changed
+            if (this.previousState !== this.state || this.isMoving !== this.wasMoving) {
+                this.animationManager.setAnimationState(this, animationState);
+            }
+            
+            this.wasMoving = this.isMoving;
         }
     }
 }

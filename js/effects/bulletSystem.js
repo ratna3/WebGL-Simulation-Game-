@@ -100,12 +100,14 @@ class BulletSystem {
         try {
             // Create a glowing spherical trail behind the bullet
             const trailGeometry = new THREE.SphereGeometry(0.03, 6, 6); // Smaller sphere for trail
-            const trailMaterial = new THREE.MeshBasicMaterial({
+            const trailMaterial = new THREE.MeshStandardMaterial({
                 color: bullet.shooter === 'player' ? 0xffff88 : 0xff6644,
                 transparent: true,
                 opacity: 0.7,
                 emissive: bullet.shooter === 'player' ? 0xffff44 : 0xff4422,
-                emissiveIntensity: 0.8
+                emissiveIntensity: 0.8,
+                metalness: 0.0,
+                roughness: 0.5
             });
             
             const trail = new THREE.Mesh(trailGeometry, trailMaterial);
@@ -118,11 +120,15 @@ class BulletSystem {
             const fadeInterval = setInterval(() => {
                 opacity -= 0.1;
                 if (opacity <= 0) {
-                    this.scene.remove(trail);
+                    if (trail.parent) {
+                        trail.parent.remove(trail);
+                    }
                     clearInterval(fadeInterval);
                 } else {
                     trail.material.opacity = opacity;
-                    trail.material.emissiveIntensity = opacity;
+                    // Move trail slightly behind bullet
+                    const offset = bullet.direction.clone().multiplyScalar(-0.1);
+                    trail.position.copy(bullet.mesh.position).add(offset);
                 }
             }, 50);
             
@@ -146,49 +152,73 @@ class BulletSystem {
                 hitPosition: hitPosition
             });
             
-            // Check what was hit with better detection
+            // Check what was hit with improved detection
             let hitTarget = null;
             
-            // ENHANCED enemy detection
+            // ENHANCED enemy detection - check all body parts
             if (window.game && window.game.npcManager) {
                 console.log("Checking enemy collisions...");
                 console.log("Available enemies:", window.game.npcManager.enemies.length);
                 
                 for (let i = 0; i < window.game.npcManager.enemies.length; i++) {
                     const enemy = window.game.npcManager.enemies[i];
-                    console.log(`Enemy ${i}:`, {
-                        name: enemy.name || 'Unknown',
-                        id: enemy.id || 'No ID',
-                        bodyId: enemy.body?.id,
-                        isDead: enemy.isDead,
-                        bodyExists: !!enemy.body
-                    });
                     
-                    if (enemy.body === otherBody && !enemy.isDead) {
-                        hitTarget = { type: 'enemy', target: enemy };
-                        console.log("HIT ENEMY:", enemy.name || 'Unknown');
-                        break;
+                    if (!enemy.isDead && enemy.body) {
+                        // Check direct body hit
+                        if (enemy.body === otherBody) {
+                            hitTarget = { type: 'enemy', target: enemy };
+                            console.log("HIT ENEMY BODY:", enemy.name || 'Unknown');
+                            break;
+                        }
+                        
+                        // Check if bullet hit any part of enemy (improved detection)
+                        if (enemy.group) {
+                            const enemyPosition = enemy.body.position;
+                            const bulletPosition = bullet.mesh.position;
+                            const distance = Math.sqrt(
+                                Math.pow(enemyPosition.x - bulletPosition.x, 2) + 
+                                Math.pow(enemyPosition.y - bulletPosition.y, 2) + 
+                                Math.pow(enemyPosition.z - bulletPosition.z, 2)
+                            );
+                            
+                            // If bullet is very close to enemy, consider it a hit
+                            if (distance < 1.5) { // Within 1.5 units of enemy center
+                                hitTarget = { type: 'enemy', target: enemy };
+                                console.log("HIT ENEMY (proximity):", enemy.name || 'Unknown');
+                                break;
+                            }
+                        }
                     }
                 }
                 
                 // Check NPCs if no enemy hit
                 if (!hitTarget) {
-                    console.log("Checking NPC collisions...");
-                    console.log("Available NPCs:", window.game.npcManager.npcs.length);
-                    
                     for (let i = 0; i < window.game.npcManager.npcs.length; i++) {
                         const npc = window.game.npcManager.npcs[i];
-                        console.log(`NPC ${i}:`, {
-                            name: npc.name || 'Unknown',
-                            bodyId: npc.body?.id,
-                            isDead: npc.isDead,
-                            bodyExists: !!npc.body
-                        });
                         
-                        if (npc.body === otherBody && !npc.isDead) {
-                            hitTarget = { type: 'npc', target: npc };
-                            console.log("HIT NPC:", npc.name || 'Unknown');
-                            break;
+                        if (!npc.isDead && npc.body) {
+                            if (npc.body === otherBody) {
+                                hitTarget = { type: 'npc', target: npc };
+                                console.log("HIT NPC:", npc.name || 'Unknown');
+                                break;
+                            }
+                            
+                            // Proximity check for NPCs too
+                            if (npc.group) {
+                                const npcPosition = npc.body.position;
+                                const bulletPosition = bullet.mesh.position;
+                                const distance = Math.sqrt(
+                                    Math.pow(npcPosition.x - bulletPosition.x, 2) + 
+                                    Math.pow(npcPosition.y - bulletPosition.y, 2) + 
+                                    Math.pow(npcPosition.z - bulletPosition.z, 2)
+                                );
+                                
+                                if (distance < 1.5) {
+                                    hitTarget = { type: 'npc', target: npc };
+                                    console.log("HIT NPC (proximity):", npc.name || 'Unknown');
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -204,22 +234,6 @@ class BulletSystem {
             
             if (!hitTarget) {
                 console.log("Bullet hit environment/unknown object");
-                console.log("Other body ID:", otherBody.id);
-                
-                // Check if we can find the target by brute force body matching
-                if (window.game && window.game.npcManager) {
-                    const allEntities = [...window.game.npcManager.enemies, ...window.game.npcManager.npcs];
-                    for (const entity of allEntities) {
-                        if (entity.body && entity.body.id === otherBody.id && !entity.isDead) {
-                            hitTarget = { 
-                                type: entity.health !== undefined && entity.health === 160 ? 'enemy' : 'npc', 
-                                target: entity 
-                            };
-                            console.log("FOUND TARGET BY BRUTE FORCE:", entity.name || entity.id);
-                            break;
-                        }
-                    }
-                }
             }
             
             // Handle damage if target found
@@ -255,9 +269,7 @@ class BulletSystem {
                 case 'enemy':
                     console.log("ENEMY HIT - Processing damage...");
                     console.log("Enemy name:", hitTarget.target.name || 'Unknown');
-                    console.log("Enemy ID:", hitTarget.target.id || 'Unknown');
                     console.log("Enemy health before:", hitTarget.target.health);
-                    console.log("Enemy has takeDamage method:", typeof hitTarget.target.takeDamage === 'function');
                     
                     if (typeof hitTarget.target.takeDamage === 'function') {
                         const wasKilled = hitTarget.target.takeDamage(damage);
@@ -274,10 +286,14 @@ class BulletSystem {
                         // Show hit feedback
                         this.showDamageNumber(hitPosition, damage, '#ff0000');
                         
+                        // Update health bar
+                        if (hitTarget.target.updateHealthBar) {
+                            hitTarget.target.updateHealthBar();
+                        }
+                        
                         // Show enemy health remaining
                         if (!wasKilled) {
                             console.log(`${hitTarget.target.name} health remaining: ${hitTarget.target.health}/${hitTarget.target.maxHealth}`);
-                            console.log(`Shots needed to kill: ${Math.ceil(hitTarget.target.health / 40)}`);
                         }
                     } else {
                         console.error("Enemy missing takeDamage method!");
@@ -380,56 +396,58 @@ class BulletSystem {
             // Create multiple spherical spark particles
             const sparkCount = 8;
             for (let i = 0; i < sparkCount; i++) {
-                const sparkGeometry = new THREE.SphereGeometry(0.03, 6, 6); // Spherical sparks
-                const sparkMaterial = new THREE.MeshBasicMaterial({
+                const sparkGeometry = new THREE.SphereGeometry(0.03, 6, 6);
+                const sparkMaterial = new THREE.MeshStandardMaterial({
                     color: shooter === 'player' ? 0xffaa00 : 0xff4400,
                     emissive: shooter === 'player' ? 0xffaa00 : 0xff4400,
-                    emissiveIntensity: 1.0
+                    emissiveIntensity: 1.0,
+                    metalness: 0.1,
+                    roughness: 0.3
                 });
                 
                 const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
                 spark.position.copy(position);
                 
                 // Random spark direction
-                const sparkDirection = new THREE.Vector3(
-                    (Math.random() - 0.5) * 2,
-                    (Math.random() - 0.5) * 2,
-                    (Math.random() - 0.5) * 2
-                ).normalize().multiplyScalar(0.8);
+                const velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 4,
+                    Math.random() * 2 + 1,
+                    (Math.random() - 0.5) * 4
+                );
                 
                 this.scene.add(spark);
                 
                 // Animate spark
-                const startTime = Date.now();
-                const animateSpark = () => {
-                    const elapsed = Date.now() - startTime;
-                    if (elapsed > 400) {
-                        this.scene.remove(spark);
-                        return;
+                let sparkLife = 1.0;
+                const sparkInterval = setInterval(() => {
+                    sparkLife -= 0.1;
+                    if (sparkLife <= 0) {
+                        if (spark.parent) {
+                            spark.parent.remove(spark);
+                        }
+                        clearInterval(sparkInterval);
+                    } else {
+                        // Move spark
+                        velocity.y -= 0.2; // Gravity
+                        spark.position.add(velocity.clone().multiplyScalar(0.02));
+                        
+                        // Fade spark
+                        spark.material.emissiveIntensity = sparkLife;
+                        spark.scale.setScalar(sparkLife * 0.5);
                     }
-                    
-                    // Move spark
-                    spark.position.add(sparkDirection.clone().multiplyScalar(0.03));
-                    
-                    // Fade spark
-                    const opacity = 1 - (elapsed / 400);
-                    spark.material.opacity = opacity;
-                    spark.material.transparent = true;
-                    spark.material.emissiveIntensity = opacity;
-                    
-                    requestAnimationFrame(animateSpark);
-                };
-                animateSpark();
+                }, 30);
             }
             
             // Create central impact flash
             const flashGeometry = new THREE.SphereGeometry(0.08, 8, 8);
-            const flashMaterial = new THREE.MeshBasicMaterial({
+            const flashMaterial = new THREE.MeshStandardMaterial({
                 color: 0xffffff,
                 emissive: 0xffffff,
                 emissiveIntensity: 2.0,
                 transparent: true,
-                opacity: 1.0
+                opacity: 1.0,
+                metalness: 0.0,
+                roughness: 0.0
             });
             
             const flash = new THREE.Mesh(flashGeometry, flashMaterial);
@@ -439,13 +457,16 @@ class BulletSystem {
             // Animate flash
             let flashOpacity = 1.0;
             const flashInterval = setInterval(() => {
-                flashOpacity -= 0.15;
+                flashOpacity -= 0.2;
                 if (flashOpacity <= 0) {
-                    this.scene.remove(flash);
+                    if (flash.parent) {
+                        flash.parent.remove(flash);
+                    }
                     clearInterval(flashInterval);
                 } else {
                     flash.material.opacity = flashOpacity;
                     flash.material.emissiveIntensity = flashOpacity * 2;
+                    flash.scale.setScalar(1 + (1 - flashOpacity) * 0.5);
                 }
             }, 30);
             
@@ -576,10 +597,12 @@ class BulletSystem {
             if (!enemy.weaponGroup) return;
             
             const flashGeometry = new THREE.SphereGeometry(0.08, 6, 6);
-            const flashMaterial = new THREE.MeshBasicMaterial({
+            const flashMaterial = new THREE.MeshStandardMaterial({
                 color: 0xff4400,
                 emissive: 0xff4400,
-                emissiveIntensity: 1
+                emissiveIntensity: 1,
+                metalness: 0.0,
+                roughness: 0.0
             });
             const flash = new THREE.Mesh(flashGeometry, flashMaterial);
             
@@ -589,8 +612,8 @@ class BulletSystem {
             
             // Remove flash after brief moment
             setTimeout(() => {
-                if (enemy.weaponGroup) {
-                    enemy.weaponGroup.remove(flash);
+                if (flash.parent) {
+                    flash.parent.remove(flash);
                 }
             }, 100);
             

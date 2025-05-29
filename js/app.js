@@ -334,22 +334,81 @@ class Game {
                 throw new Error("NPCManager class not available - check if npc.js loaded correctly");
             }
             
+            // Check if CharacterDesign is available
+            if (typeof CharacterDesign === 'undefined') {
+                console.error("CharacterDesign class not loaded");
+                throw new Error("CharacterDesign class not available - faces will not load properly");
+            }
+            
             // Create NPC manager
             this.npcManager = new NPCManager(this.scene, this.world);
             console.log("NPC Manager created successfully");
             
-            // Spawn undercover mission NPCs (this method now exists)
-            const npcCount = this.npcManager.spawnUndercoverNPCs();
-            console.log(`Undercover NPCs spawned: ${npcCount} NPCs`);
+            // Spawn city NPCs with facial features
+            this.npcManager.spawnCityNPCs();
+            console.log("City NPCs spawned with facial features");
             
-            // Spawn enemies near parks (not inside parks)
+            // Spawn enemies near parks
             const enemyCount = this.npcManager.spawnEnemiesNearParks();
-            console.log(`${enemyCount} enemies spawned near parks`);
+            console.log(`${enemyCount} enemies spawned near parks with facial features`);
             
-            console.log("City NPCs and enemies initialized successfully");
+            // Verify that NPCs have facial features
+            setTimeout(() => {
+                this.verifyNPCFaces();
+            }, 1000);
+            
+            console.log("City NPCs and enemies initialized successfully with facial features");
         } catch (error) {
             console.error("Error setting up NPCs:", error);
             throw error; // Re-throw to handle in startGame
+        }
+    }
+    
+    verifyNPCFaces() {
+        if (!this.npcManager) return;
+        
+        let npcCount = 0;
+        let facesLoaded = 0;
+        
+        // Check NPCs
+        this.npcManager.npcs.forEach(npc => {
+            npcCount++;
+            if (npc.group) {
+                let hasFacialFeatures = false;
+                npc.group.traverse(child => {
+                    if (child instanceof THREE.Mesh && child.material) {
+                        // Check if this might be a facial feature based on size and position
+                        const scale = child.scale.x;
+                        if (scale < 0.1 && child.position.y > 1.5) {
+                            hasFacialFeatures = true;
+                        }
+                    }
+                });
+                if (hasFacialFeatures) facesLoaded++;
+            }
+        });
+        
+        // Check enemies
+        this.npcManager.enemies.forEach(enemy => {
+            npcCount++;
+            if (enemy.group) {
+                let hasFacialFeatures = false;
+                enemy.group.traverse(child => {
+                    if (child instanceof THREE.Mesh && child.material) {
+                        const scale = child.scale.x;
+                        if (scale < 0.1 && child.position.y > 1.5) {
+                            hasFacialFeatures = true;
+                        }
+                    }
+                });
+                if (hasFacialFeatures) facesLoaded++;
+            }
+        });
+        
+        console.log(`Face verification: ${facesLoaded}/${npcCount} characters have facial features loaded`);
+        
+        if (facesLoaded === 0 && npcCount > 0) {
+            console.warn("No facial features detected on any characters - there may be a loading issue");
         }
     }
     
@@ -640,35 +699,78 @@ class Game {
             }
             
             // Update environment
-            if (this.environment) {
-                this.environment.update(delta);
+            if (this.environment && typeof this.environment.update === 'function') {
+                try {
+                    this.environment.update(delta);
+                } catch (envError) {
+                    console.error("Environment update error:", envError);
+                }
             }
             
             // Update player
             if (this.isGameActive && this.player) {
-                this.player.update(delta);
-                
-                // Debug weapon visibility periodically
-                if (this.player.weapon && this.player.weapon.isEquipped) {
-                    // Check if weapon is still visible every few seconds
-                    if (!this.lastWeaponCheck || Date.now() - this.lastWeaponCheck > 5000) {
-                        this.lastWeaponCheck = Date.now();
-                        
-                        if (!this.player.weapon.weaponGroup.visible) {
-                            console.warn("Weapon became invisible, forcing visibility...");
-                            this.player.weapon.forceVisible();
+                try {
+                    this.player.update(delta);
+                    
+                    // Debug weapon visibility periodically
+                    if (this.player.weapon && this.player.weapon.isEquipped) {
+                        // Check if weapon is still visible every few seconds
+                        if (!this.lastWeaponCheck || Date.now() - this.lastWeaponCheck > 5000) {
+                            this.lastWeaponCheck = Date.now();
+                            
+                            if (!this.player.weapon.weaponGroup.visible) {
+                                console.warn("Weapon became invisible, forcing visibility...");
+                                this.player.weapon.forceVisible();
+                            }
                         }
                     }
+                } catch (playerError) {
+                    console.error("Player update error:", playerError);
                 }
             }
             
-            // Update NPCs and enemies with error handling
+            // Update NPCs and enemies with enhanced error handling
             if (this.npcManager && this.player && this.player.body) {
                 try {
                     const playerPosition = this.player.body.position;
-                    this.npcManager.update(playerPosition, delta);
-                } catch (npcError) {
-                    console.error("NPC update error:", npcError);
+                    
+                    // Update NPCs safely
+                    if (this.npcManager.npcs && Array.isArray(this.npcManager.npcs)) {
+                        this.npcManager.npcs.forEach((npc, index) => {
+                            try {
+                                if (npc && typeof npc.update === 'function' && npc.group && !npc.isDead) {
+                                    npc.update(playerPosition, delta);
+                                }
+                            } catch (npcError) {
+                                console.error(`NPC ${index} update error:`, npcError);
+                            }
+                        });
+                    }
+                    
+                    // Update enemies safely
+                    if (this.npcManager.enemies && Array.isArray(this.npcManager.enemies)) {
+                        this.npcManager.enemies.forEach((enemy, index) => {
+                            try {
+                                if (enemy && typeof enemy.update === 'function' && enemy.group && !enemy.isDead) {
+                                    enemy.update(playerPosition, delta);
+                                }
+                            } catch (enemyError) {
+                                console.error(`Enemy ${index} (${enemy.name || 'Unknown'}) update error:`, enemyError);
+                                
+                                // Log more details about the enemy state
+                                console.log("Enemy state:", {
+                                    name: enemy.name,
+                                    isDead: enemy.isDead,
+                                    health: enemy.health,
+                                    state: enemy.state,
+                                    hasBody: !!enemy.body,
+                                    hasGroup: !!enemy.group
+                                });
+                            }
+                        });
+                    }
+                } catch (npcManagerError) {
+                    console.error("NPC Manager update error:", npcManagerError);
                 }
             }
         } catch (error) {
@@ -687,6 +789,15 @@ class Game {
         
         // Screen flash effect for damage
         this.createDamageEffect();
+        
+        // Notify all enemies to update their health bar visibility
+        if (this.npcManager && this.npcManager.enemies) {
+            this.npcManager.enemies.forEach(enemy => {
+                if (enemy.isEnemy && typeof enemy.checkHealthBarVisibility === 'function') {
+                    enemy.checkHealthBarVisibility();
+                }
+            });
+        }
         
         if (this.playerHealth <= 0) {
             console.log("Player killed by enemy gunfire!");

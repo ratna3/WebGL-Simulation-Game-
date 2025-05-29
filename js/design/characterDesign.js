@@ -96,9 +96,9 @@ class CharacterDesign {
             
             const colors = colorSchemes[type] || colorSchemes.civilian;
             
-            // Create detailed head with facial features
+            // Create detailed head with facial features - Fixed positioning
             const headGroup = this.createDetailedHead(colors, scale);
-            headGroup.position.y = 2.0 * scale;
+            headGroup.position.y = 1.6 * scale; // Adjusted height to fit better with body proportions
             group.add(headGroup);
             
             // Create detailed torso
@@ -142,7 +142,7 @@ class CharacterDesign {
                 }
             };
             
-            console.log(`Detailed ${type} character created with facial features and limbs (scale: ${scale})`);
+            console.log(`Detailed ${type} character created with properly positioned facial features (scale: ${scale})`);
             
         } catch (error) {
             console.error("Error creating detailed humanoid character:", error);
@@ -152,95 +152,123 @@ class CharacterDesign {
     createDetailedHead(colors, scale) {
         const headGroup = new THREE.Group();
         
-        // Main head shape (slightly oval)
+        // Main head shape (slightly oval) - Fixed geometry
         const headGeometry = new THREE.SphereGeometry(0.26 * scale, 16, 12);
         headGeometry.scale(1, 1.1, 0.9); // Make it more head-shaped
         const headMaterial = new THREE.MeshStandardMaterial({ 
             color: colors.skin,
-            roughness: 0.8
+            roughness: 0.8,
+            metalness: 0.0
         });
         const head = new THREE.Mesh(headGeometry, headMaterial);
         head.castShadow = true;
+        head.receiveShadow = true;
         headGroup.add(head);
         
-        // Hair
-        const hairGeometry = new THREE.SphereGeometry(0.27 * scale, 12, 8);
-        hairGeometry.scale(1, 0.8, 1);
+        // Hair - Positioned correctly on top of head
+        const hairGeometry = new THREE.SphereGeometry(0.28 * scale, 12, 8);
+        hairGeometry.scale(1, 0.7, 1);
         const hairMaterial = new THREE.MeshStandardMaterial({ 
             color: colors.hair,
             roughness: 0.9
         });
         const hair = new THREE.Mesh(hairGeometry, hairMaterial);
-        hair.position.y = 0.08 * scale;
+        hair.position.y = 0.12 * scale; // Moved up to sit properly on head
         hair.castShadow = true;
         headGroup.add(hair);
         
-        // Eyes
-        const eyeGeometry = new THREE.SphereGeometry(0.04 * scale, 8, 8);
+        // Eyes - Fixed positioning to be on face surface
+        const eyeGeometry = new THREE.SphereGeometry(0.03 * scale, 8, 8);
         const eyeMaterial = new THREE.MeshStandardMaterial({ 
             color: colors.eyes,
             emissive: colors.eyes,
-            emissiveIntensity: 0.2
+            emissiveIntensity: 0.1
         });
         
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        leftEye.position.set(-0.08 * scale, 0.05 * scale, 0.22 * scale);
+        leftEye.position.set(-0.06 * scale, 0.08 * scale, 0.20 * scale); // Adjusted positioning
         headGroup.add(leftEye);
         
         const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        rightEye.position.set(0.08 * scale, 0.05 * scale, 0.22 * scale);
+        rightEye.position.set(0.06 * scale, 0.08 * scale, 0.20 * scale); // Adjusted positioning
         headGroup.add(rightEye);
         
-        // Pupils
-        const pupilGeometry = new THREE.SphereGeometry(0.02 * scale, 6, 6);
-        const pupilMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+        // Pupils - Fixed to be properly aligned with eyes
+        const pupilGeometry = new THREE.SphereGeometry(0.015 * scale, 6, 6);
+        const pupilMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x000000,
+            roughness: 0.2
+        });
         
         const leftPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-        leftPupil.position.set(-0.08 * scale, 0.05 * scale, 0.24 * scale);
+        leftPupil.position.set(-0.06 * scale, 0.08 * scale, 0.22 * scale); // Slightly forward
         headGroup.add(leftPupil);
         
         const rightPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-        rightPupil.position.set(0.08 * scale, 0.05 * scale, 0.24 * scale);
+        rightPupil.position.set(0.06 * scale, 0.08 * scale, 0.22 * scale); // Slightly forward
         headGroup.add(rightPupil);
         
-        // Nose
-        const noseGeometry = new THREE.ConeGeometry(0.02 * scale, 0.06 * scale, 6);
+        // Nose - Fixed positioning and size
+        const noseGeometry = new THREE.ConeGeometry(0.015 * scale, 0.04 * scale, 6);
         const noseMaterial = new THREE.MeshStandardMaterial({ 
             color: colors.skin,
             roughness: 0.8
         });
         const nose = new THREE.Mesh(noseGeometry, noseMaterial);
-        nose.position.set(0, -0.02 * scale, 0.24 * scale);
-        nose.rotation.x = Math.PI;
+        nose.position.set(0, 0.02 * scale, 0.22 * scale); // Centered and positioned properly
+        nose.rotation.x = Math.PI; // Point downward
         headGroup.add(nose);
         
-        // Mouth
-        const mouthGeometry = new THREE.TorusGeometry(0.04 * scale, 0.01 * scale, 8, 16, Math.PI);
+        // Mouth - Fixed size and positioning
+        const mouthGeometry = new THREE.EllipseCurve(
+            0, 0,            // ax, aY
+            0.03 * scale, 0.01 * scale, // xRadius, yRadius
+            0, Math.PI,      // aStartAngle, aEndAngle
+            false,           // aClockwise
+            0                // aRotation
+        );
+        const points = mouthGeometry.getPoints(16);
+        const mouthShape = new THREE.BufferGeometry().setFromPoints(points);
         const mouthMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x8B4513,
             roughness: 0.6
         });
-        const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
-        mouth.position.set(0, -0.08 * scale, 0.22 * scale);
-        mouth.rotation.x = Math.PI;
+        const mouth = new THREE.Line(mouthShape, mouthMaterial);
+        mouth.position.set(0, -0.05 * scale, 0.21 * scale); // Positioned below nose
         headGroup.add(mouth);
         
-        // Ears
-        const earGeometry = new THREE.SphereGeometry(0.03 * scale, 8, 8);
-        earGeometry.scale(0.5, 1, 0.8);
+        // Ears - Fixed size and positioning
+        const earGeometry = new THREE.SphereGeometry(0.025 * scale, 8, 8);
+        earGeometry.scale(0.6, 1, 0.8);
         const earMaterial = new THREE.MeshStandardMaterial({ 
             color: colors.skin,
             roughness: 0.8
         });
         
         const leftEar = new THREE.Mesh(earGeometry, earMaterial);
-        leftEar.position.set(-0.25 * scale, 0, 0);
+        leftEar.position.set(-0.24 * scale, 0.02 * scale, 0); // Positioned on sides of head
         headGroup.add(leftEar);
         
         const rightEar = new THREE.Mesh(earGeometry, earMaterial);
-        rightEar.position.set(0.25 * scale, 0, 0);
+        rightEar.position.set(0.24 * scale, 0.02 * scale, 0); // Positioned on sides of head
         headGroup.add(rightEar);
         
+        // Add eyebrows for better facial definition
+        const eyebrowGeometry = new THREE.BoxGeometry(0.04 * scale, 0.005 * scale, 0.01 * scale);
+        const eyebrowMaterial = new THREE.MeshStandardMaterial({ 
+            color: colors.hair,
+            roughness: 0.9
+        });
+        
+        const leftEyebrow = new THREE.Mesh(eyebrowGeometry, eyebrowMaterial);
+        leftEyebrow.position.set(-0.06 * scale, 0.12 * scale, 0.21 * scale);
+        headGroup.add(leftEyebrow);
+        
+        const rightEyebrow = new THREE.Mesh(eyebrowGeometry, eyebrowMaterial);
+        rightEyebrow.position.set(0.06 * scale, 0.12 * scale, 0.21 * scale);
+        headGroup.add(rightEyebrow);
+        
+        console.log(`Created detailed head with facial features at scale ${scale}`);
         return headGroup;
     }
     
