@@ -415,7 +415,8 @@
         
         <!-- Cover Status -->
         <div id="cover-status">
-            Stealth Mode: <span id="stealth-status">OFF</span>
+            Cover: <span id="cover-level">100%</span> | 
+            Status: <span id="stealth-status">SECURE</span>
         </div>
         
         <!-- Interaction Prompt -->
@@ -632,11 +633,12 @@
                 'js/buildings/buildingSystem.js',
                 'js/design/characterDesign.js',
                 'js/city/cityGenerator.js',
-                'js/effects/bulletSystem.js',      // Load bullet system early
+                'js/effects/animationManager.js',    // Add animation manager
+                'js/effects/bulletSystem.js',
                 'js/game/missionManager.js',
                 'js/environment.js',
                 'js/dialogue.js',
-                'js/npc.js',                    // Load NPC before weapons and player
+                'js/npc.js',
                 'js/weapons.js',
                 'js/player.js',
                 'js/app.js'
@@ -650,7 +652,7 @@
                     debugLog("All game scripts loaded successfully");
                     
                     // Verify critical classes are loaded
-                    const requiredClasses = ['NPCManager', 'Player', 'Weapon', 'MissionManager', 'BulletSystem'];
+                    const requiredClasses = ['NPCManager', 'Player', 'Weapon', 'MissionManager', 'BulletSystem', 'EnemyAnimationManager'];
                     const missingClasses = requiredClasses.filter(className => typeof window[className] === 'undefined');
                     
                     if (missingClasses.length > 0) {

@@ -15,13 +15,15 @@ class Game {
         this.npcManager = null;
         this.dialogueSystem = null;
         this.missionManager = null;
-        this.bulletSystem = null; // Add bullet system
+        this.bulletSystem = null;
+        this.animationManager = null;
+        this.coverSystem = null; // Add cover system
         
         // Game state
         this.isGameActive = false;
         
-        // Player health system
-        this.playerHealth = 100;
+        // Player health system - Balanced for 4-shot death
+        this.playerHealth = 100; // Keep at 100 (25 damage * 4 shots = 100)
         this.maxPlayerHealth = 100;
         
         // Initialize the game
@@ -40,6 +42,22 @@ class Game {
             
             this.setupBasicEnvironment();
             debugLog("Basic environment setup complete");
+            
+            // Initialize cover system
+            this.setupCoverSystem();
+            debugLog("Cover system initialized");
+            
+            // Initialize animation manager
+            try {
+                if (typeof EnemyAnimationManager !== 'undefined') {
+                    this.animationManager = new EnemyAnimationManager();
+                    debugLog("Animation manager initialized successfully");
+                } else {
+                    console.warn("EnemyAnimationManager class not available");
+                }
+            } catch (animError) {
+                console.error("Failed to initialize animation manager:", animError);
+            }
             
             // Initialize bullet system with error handling
             try {
@@ -184,6 +202,75 @@ class Game {
         }
     }
     
+    setupLighting() {
+        try {
+            console.log("Setting up enhanced lighting for weapon visibility");
+            
+            // Ambient light for overall scene illumination
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6); // Increased intensity
+            this.scene.add(ambientLight);
+            
+            // Directional light (sun)
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased intensity
+            directionalLight.position.set(50, 100, 50);
+            directionalLight.castShadow = true;
+            
+            // Enhanced shadow settings
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            directionalLight.shadow.camera.left = -100;
+            directionalLight.shadow.camera.right = 100;
+            directionalLight.shadow.camera.top = 100;
+            directionalLight.shadow.camera.bottom = -100;
+            
+            this.scene.add(directionalLight);
+            
+            // Add hemisphere light for better weapon visibility
+            const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x8B4513, 0.4);
+            this.scene.add(hemisphereLight);
+            
+            // Add point light that follows camera for weapon illumination
+            this.cameraLight = new THREE.PointLight(0xffffff, 0.3, 10);
+            this.camera.add(this.cameraLight);
+            this.cameraLight.position.set(0, 0, 1); // Slightly forward of camera
+            
+            console.log("Enhanced lighting setup completed");
+        } catch (error) {
+            console.error("Error setting up lighting:", error);
+        }
+    }
+    
+    setupRenderer() {
+        try {
+            this.renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: false,
+                powerPreference: "high-performance"
+            });
+            
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            
+            // Enhanced renderer settings for better weapon visibility
+            this.renderer.shadowMap.enabled = true;
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            this.renderer.outputEncoding = THREE.sRGBEncoding;
+            this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            this.renderer.toneMappingExposure = 1.2; // Slightly brighter
+            
+            // Ensure weapon visibility in all lighting conditions
+            this.renderer.gammaFactor = 2.2;
+            
+            document.body.appendChild(this.renderer.domElement);
+            
+            console.log("Enhanced renderer setup completed for weapon visibility");
+        } catch (error) {
+            console.error("Error setting up renderer:", error);
+        }
+    }
+    
     startGame() {
         console.log("Game.startGame() called");
         try {
@@ -251,19 +338,95 @@ class Game {
             this.npcManager = new NPCManager(this.scene, this.world);
             console.log("NPC Manager created successfully");
             
-            // Spawn undercover mission NPCs
-            this.npcManager.spawnUndercoverNPCs();
-            console.log("Undercover NPCs spawned");
+            // Spawn undercover mission NPCs (this method now exists)
+            const npcCount = this.npcManager.spawnUndercoverNPCs();
+            console.log(`Undercover NPCs spawned: ${npcCount} NPCs`);
             
-            // Spawn enemies in parks near trees
-            const enemyCount = this.npcManager.spawnEnemiesInParks();
-            console.log(`${enemyCount} enemies spawned in parks`);
+            // Spawn enemies near parks (not inside parks)
+            const enemyCount = this.npcManager.spawnEnemiesNearParks();
+            console.log(`${enemyCount} enemies spawned near parks`);
             
-            console.log("City NPCs and enemies initialized");
+            console.log("City NPCs and enemies initialized successfully");
         } catch (error) {
             console.error("Error setting up NPCs:", error);
             throw error; // Re-throw to handle in startGame
         }
+    }
+    
+    setupCoverSystem() {
+        this.coverSystem = {
+            coverLevel: 100,
+            maxCover: 100,
+            
+            getCoverLevel() {
+                return this.coverLevel;
+            },
+            
+            setCoverLevel(level) {
+                this.coverLevel = Math.max(0, Math.min(this.maxCover, level));
+                this.updateCoverDisplay();
+            },
+            
+            modifyCover(amount) {
+                this.setCoverLevel(this.coverLevel + amount);
+            },
+            
+            updateCoverDisplay() {
+                const coverElement = document.getElementById('cover-level');
+                if (coverElement) {
+                    coverElement.textContent = `${Math.round(this.coverLevel)}%`;
+                }
+                
+                const stealthStatus = document.getElementById('stealth-status');
+                if (stealthStatus) {
+                    if (this.coverLevel < 60) {
+                        stealthStatus.textContent = "BLOWN";
+                        stealthStatus.style.color = "#ff0000";
+                    } else if (this.coverLevel < 80) {
+                        stealthStatus.textContent = "SUSPICIOUS";
+                        stealthStatus.style.color = "#ffaa00";
+                    } else {
+                        stealthStatus.textContent = "SECURE";
+                        stealthStatus.style.color = "#00ff00";
+                    }
+                }
+            },
+            
+            // Factors that affect cover
+            updateCoverBasedOnActions() {
+                let coverModifier = 0;
+                
+                // Check if player has weapon equipped
+                if (window.game && window.game.player && window.game.player.weapon && window.game.player.weapon.isEquipped) {
+                    coverModifier -= 0.5; // Slow cover loss when weapon visible
+                }
+                
+                // Check player movement speed
+                if (window.game && window.game.player && window.game.player.body) {
+                    const velocity = window.game.player.body.velocity;
+                    const speed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+                    
+                    if (speed > 15) {
+                        coverModifier -= 1.0; // Running reduces cover faster
+                    } else if (speed < 2) {
+                        coverModifier += 0.2; // Standing still helps cover
+                    }
+                }
+                
+                // Apply cover changes
+                if (coverModifier !== 0) {
+                    this.modifyCover(coverModifier);
+                }
+                
+                // Cover naturally regenerates slowly when not doing suspicious things
+                if (coverModifier >= 0 && this.coverLevel < this.maxCover) {
+                    this.modifyCover(0.1);
+                }
+            }
+        };
+        
+        // Initialize cover display
+        this.coverSystem.updateCoverDisplay();
     }
     
     restartMission() {
@@ -274,6 +437,11 @@ class Game {
         // Clean up bullet system
         if (this.bulletSystem) {
             this.bulletSystem.cleanup();
+        }
+        
+        // Clean up animation manager
+        if (this.animationManager) {
+            this.animationManager.cleanup();
         }
         
         // Reset mission state
@@ -303,7 +471,7 @@ class Game {
         }
         
         this.isGameActive = true;
-        console.log("Mission restarted");
+        console.log("Mission restarted with animation system");
     }
     
     showMissionBriefing() {
@@ -448,6 +616,20 @@ class Game {
                 this.world.step(1/60, delta, 3);
             }
             
+            // Update cover system
+            if (this.coverSystem) {
+                this.coverSystem.updateCoverBasedOnActions();
+            }
+            
+            // Update animation manager
+            if (this.animationManager) {
+                try {
+                    this.animationManager.update(delta);
+                } catch (animError) {
+                    console.error("Animation manager update error:", animError);
+                }
+            }
+            
             // Update bullet system with error handling
             if (this.bulletSystem && typeof this.bulletSystem.update === 'function') {
                 try {
@@ -465,6 +647,19 @@ class Game {
             // Update player
             if (this.isGameActive && this.player) {
                 this.player.update(delta);
+                
+                // Debug weapon visibility periodically
+                if (this.player.weapon && this.player.weapon.isEquipped) {
+                    // Check if weapon is still visible every few seconds
+                    if (!this.lastWeaponCheck || Date.now() - this.lastWeaponCheck > 5000) {
+                        this.lastWeaponCheck = Date.now();
+                        
+                        if (!this.player.weapon.weaponGroup.visible) {
+                            console.warn("Weapon became invisible, forcing visibility...");
+                            this.player.weapon.forceVisible();
+                        }
+                    }
+                }
             }
             
             // Update NPCs and enemies with error handling
@@ -494,6 +689,7 @@ class Game {
         this.createDamageEffect();
         
         if (this.playerHealth <= 0) {
+            console.log("Player killed by enemy gunfire!");
             this.gameOver();
         }
     }
@@ -581,5 +777,5 @@ class Game {
 }
 
 // Create game instance when this script loads
-debugLog("Creating game instance");
+debugLog("Creating game instance with enhanced weapon visibility and animations");
 window.game = new Game();

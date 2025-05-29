@@ -3,16 +3,16 @@ class Weapon {
         this.scene = scene;
         this.camera = camera;
         this.world = world;
-        this.isEquipped = false;
+        this.isEquipped = false; // START HOLSTERED
         this.weaponGroup = null;
         this.bulletSystem = null;
         
-        // Weapon stats
-        this.damage = 30;
+        // Weapon stats - EXACTLY 40 damage for 4-shot enemy kills
+        this.damage = 40; // CRITICAL: This must be exactly 40 for 4-shot kills (160 enemy health / 40 damage = 4 shots)
         this.maxAmmo = 30;
         this.currentAmmo = this.maxAmmo;
-        this.reloadTime = 2000; // 2 seconds
-        this.fireRate = 200; // ms between shots
+        this.reloadTime = 2000;
+        this.fireRate = 200;
         this.lastShotTime = 0;
         this.isReloading = false;
         
@@ -20,44 +20,157 @@ class Weapon {
         this.muzzleFlash = null;
         this.weaponModel = null;
         
-        console.log("Weapon system initialized");
+        console.log(`Weapon initialized with EXACTLY ${this.damage} damage for 4-shot enemy kills`);
+        console.log("Weapon starts HOLSTERED - press Tab to equip when needed");
         this.createWeaponModel();
-        // DON'T setup event listeners here - let player handle them
+        
+        // Make sure weapon starts holstered by updating display immediately
+        setTimeout(() => {
+            this.updateAmmoDisplay();
+        }, 100);
     }
-    
-    // Remove setupEventListeners to avoid duplicate handlers
-    // The player.js will handle all input events
     
     createWeaponModel() {
         try {
             this.weaponGroup = new THREE.Group();
             
-            // Create weapon body (simple box for now)
-            const weaponGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.4);
+            // Create realistic pistol body (main frame)
+            const weaponGeometry = new THREE.BoxGeometry(0.05, 0.12, 0.22);
             const weaponMaterial = new THREE.MeshStandardMaterial({
-                color: 0x333333,
-                metalness: 0.8,
-                roughness: 0.2
+                color: 0x1A1A1A,
+                metalness: 0.9,
+                roughness: 0.2,
+                emissive: 0x0A0A0A,
+                emissiveIntensity: 0.05
             });
             
             this.weaponModel = new THREE.Mesh(weaponGeometry, weaponMaterial);
-            this.weaponModel.position.set(0.3, -0.2, 0.3);
+            this.weaponModel.castShadow = true;
+            this.weaponModel.receiveShadow = true;
+            
+            // Position weapon for first-person view (right-handed grip)
+            this.weaponModel.position.set(0.25, -0.4, -0.2);
+            this.weaponModel.rotation.set(0, Math.PI / 8, 0);
+            
             this.weaponGroup.add(this.weaponModel);
             
-            // Add weapon barrel
-            const barrelGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8);
+            // Create detailed barrel
+            const barrelGeometry = new THREE.CylinderGeometry(0.008, 0.008, 0.15, 12);
             const barrelMaterial = new THREE.MeshStandardMaterial({
-                color: 0x222222,
-                metalness: 0.9,
-                roughness: 0.1
+                color: 0x0F0F0F,
+                metalness: 0.95,
+                roughness: 0.1,
+                emissive: 0x050505,
+                emissiveIntensity: 0.02
             });
             
             const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
             barrel.rotation.z = Math.PI / 2;
-            barrel.position.set(0.15, 0, 0);
+            barrel.position.set(0.08, 0.03, 0);
+            barrel.castShadow = true;
             this.weaponModel.add(barrel);
             
-            console.log("Weapon model created");
+            // Create slide (upper part of pistol)
+            const slideGeometry = new THREE.BoxGeometry(0.04, 0.06, 0.18);
+            const slide = new THREE.Mesh(slideGeometry, weaponMaterial);
+            slide.position.set(0, 0.04, 0);
+            slide.castShadow = true;
+            this.weaponModel.add(slide);
+            
+            // Create grip (handle)
+            const gripGeometry = new THREE.BoxGeometry(0.04, 0.16, 0.08);
+            const gripMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2A2A2A,
+                roughness: 0.8,
+                metalness: 0.3
+            });
+            const grip = new THREE.Mesh(gripGeometry, gripMaterial);
+            grip.position.set(0, -0.08, -0.07);
+            grip.castShadow = true;
+            this.weaponModel.add(grip);
+            
+            // Create trigger guard
+            const triggerGuardGeometry = new THREE.TorusGeometry(0.025, 0.004, 8, 16, Math.PI);
+            const triggerGuard = new THREE.Mesh(triggerGuardGeometry, barrelMaterial);
+            triggerGuard.position.set(0, -0.04, -0.02);
+            triggerGuard.rotation.x = Math.PI;
+            this.weaponModel.add(triggerGuard);
+            
+            // Create trigger
+            const triggerGeometry = new THREE.BoxGeometry(0.006, 0.02, 0.015);
+            const triggerMaterial = new THREE.MeshStandardMaterial({
+                color: 0x444444,
+                metalness: 0.8,
+                roughness: 0.3
+            });
+            const trigger = new THREE.Mesh(triggerGeometry, triggerMaterial);
+            trigger.position.set(0, -0.04, -0.01);
+            this.weaponModel.add(trigger);
+            
+            // Create front sight
+            const frontSightGeometry = new THREE.BoxGeometry(0.006, 0.015, 0.008);
+            const sightMaterial = new THREE.MeshStandardMaterial({
+                color: 0x666666,
+                metalness: 0.7,
+                roughness: 0.4
+            });
+            const frontSight = new THREE.Mesh(frontSightGeometry, sightMaterial);
+            frontSight.position.set(0, 0.075, 0.08);
+            this.weaponModel.add(frontSight);
+            
+            // Create rear sight
+            const rearSightGeometry = new THREE.BoxGeometry(0.008, 0.012, 0.004);
+            const rearSight = new THREE.Mesh(rearSightGeometry, sightMaterial);
+            rearSight.position.set(0, 0.07, -0.08);
+            this.weaponModel.add(rearSight);
+            
+            // Create hammer
+            const hammerGeometry = new THREE.BoxGeometry(0.008, 0.02, 0.01);
+            const hammer = new THREE.Mesh(hammerGeometry, weaponMaterial);
+            hammer.position.set(0, 0.05, -0.09);
+            hammer.rotation.x = Math.PI / 6;
+            this.weaponModel.add(hammer);
+            
+            // Create magazine (visible bottom part)
+            const magazineGeometry = new THREE.BoxGeometry(0.035, 0.08, 0.06);
+            const magazineMaterial = new THREE.MeshStandardMaterial({
+                color: 0x333333,
+                metalness: 0.6,
+                roughness: 0.5
+            });
+            const magazine = new THREE.Mesh(magazineGeometry, magazineMaterial);
+            magazine.position.set(0, -0.14, -0.02);
+            magazine.castShadow = true;
+            this.weaponModel.add(magazine);
+            
+            // Create magazine release button
+            const magReleaseGeometry = new THREE.SphereGeometry(0.008, 8, 8);
+            const magRelease = new THREE.Mesh(magReleaseGeometry, triggerMaterial);
+            magRelease.position.set(-0.03, -0.06, -0.02);
+            this.weaponModel.add(magRelease);
+            
+            // Create safety switch
+            const safetyGeometry = new THREE.BoxGeometry(0.004, 0.008, 0.006);
+            const safety = new THREE.Mesh(safetyGeometry, triggerMaterial);
+            safety.position.set(-0.025, -0.02, -0.04);
+            this.weaponModel.add(safety);
+            
+            // Create slide serrations (decorative lines)
+            for (let i = 0; i < 8; i++) {
+                const serrationGeometry = new THREE.BoxGeometry(0.001, 0.04, 0.008);
+                const serration = new THREE.Mesh(serrationGeometry, new THREE.MeshStandardMaterial({ 
+                    color: 0x0A0A0A,
+                    metalness: 0.9,
+                    roughness: 0.4
+                }));
+                serration.position.set(0.021, 0.04, -0.06 + (i * 0.012));
+                this.weaponModel.add(serration);
+            }
+            
+            // Store barrel reference for muzzle flash positioning
+            this.weaponBarrel = barrel;
+            
+            console.log("Realistic pistol model created with detailed components");
         } catch (error) {
             console.error("Error creating weapon model:", error);
         }
@@ -66,8 +179,15 @@ class Weapon {
     equip() {
         if (this.isEquipped) return;
         
+        console.log("Equipping weapon...");
         this.isEquipped = true;
+        
+        // Add weapon directly to camera so it moves with view
         this.camera.add(this.weaponGroup);
+        
+        // Make sure weapon is visible
+        this.weaponGroup.visible = true;
+        this.weaponModel.visible = true;
         
         // Connect to bullet system
         if (window.game && window.game.bulletSystem) {
@@ -75,16 +195,39 @@ class Weapon {
         }
         
         this.updateAmmoDisplay();
-        console.log("Weapon equipped");
+        console.log("Weapon equipped and should be visible");
+        
+        // Debug weapon visibility
+        this.debugWeaponVisibility();
     }
     
     holster() {
         if (!this.isEquipped) return;
         
+        console.log("Holstering weapon...");
         this.isEquipped = false;
-        this.camera.remove(this.weaponGroup);
+        
+        // Remove weapon from camera
+        if (this.weaponGroup.parent === this.camera) {
+            this.camera.remove(this.weaponGroup);
+        }
+        
         this.updateAmmoDisplay();
         console.log("Weapon holstered");
+    }
+    
+    debugWeaponVisibility() {
+        console.log("=== WEAPON DEBUG ===");
+        console.log("Weapon equipped:", this.isEquipped);
+        console.log("Weapon group exists:", !!this.weaponGroup);
+        console.log("Weapon group visible:", this.weaponGroup?.visible);
+        console.log("Weapon model exists:", !!this.weaponModel);
+        console.log("Weapon model visible:", this.weaponModel?.visible);
+        console.log("Weapon group parent:", this.weaponGroup?.parent?.type || "No parent");
+        console.log("Weapon group position:", this.weaponGroup?.position);
+        console.log("Weapon model position:", this.weaponModel?.position);
+        console.log("Camera children count:", this.camera.children.length);
+        console.log("==================");
     }
     
     fire() {
@@ -116,75 +259,89 @@ class Weapon {
     
     fireBullet() {
         try {
-            // Ensure bullet system is available with multiple checks
+            console.log("=== FIRING BULLET ===");
+            
+            // Ensure bullet system is available
             if (!this.bulletSystem) {
                 if (window.game && window.game.bulletSystem) {
                     this.bulletSystem = window.game.bulletSystem;
-                    console.log("Bullet system connected to weapon");
                 } else {
-                    console.warn("Bullet system not available, falling back to raycast");
-                    this.performRaycast();
+                    console.error("Bullet system not available!");
                     return;
                 }
             }
             
-            if (!this.bulletSystem || typeof this.bulletSystem.createBullet !== 'function') {
-                console.warn("Bullet system not properly initialized, falling back to raycast");
-                this.performRaycast();
-                return;
-            }
-            
-            // Calculate bullet start position (weapon barrel)
+            // Calculate accurate bullet start position from barrel tip
             const startPosition = new THREE.Vector3();
-            if (this.weaponGroup) {
-                // Get weapon barrel position in world space
-                const barrelOffset = new THREE.Vector3(0.3, 0, 0.35); // Barrel tip position
-                this.weaponGroup.localToWorld(barrelOffset);
-                startPosition.copy(barrelOffset);
+            
+            if (this.weaponBarrel && this.weaponGroup.parent === this.camera) {
+                // Get barrel tip in world coordinates
+                const barrelTip = new THREE.Vector3(0.075, 0, 0); // Barrel tip offset
+                this.weaponBarrel.localToWorld(barrelTip);
+                startPosition.copy(barrelTip);
+                console.log("Bullet start from barrel tip:", startPosition);
             } else {
                 // Fallback to camera position with offset
                 startPosition.copy(this.camera.position);
-                const cameraDirection = new THREE.Vector3();
-                this.camera.getWorldDirection(cameraDirection);
-                startPosition.add(cameraDirection.multiplyScalar(0.5));
+                const forward = new THREE.Vector3();
+                this.camera.getWorldDirection(forward);
+                startPosition.add(forward.multiplyScalar(0.5));
+                console.log("Bullet start from camera offset:", startPosition);
             }
             
-            // Get shooting direction
+            // Get accurate shooting direction
             const direction = new THREE.Vector3();
             this.camera.getWorldDirection(direction);
             
-            // Add slight random spread for realism
-            const spread = 0.02;
+            // Very minimal spread for accuracy
+            const spread = 0.005;
             direction.x += (Math.random() - 0.5) * spread;
             direction.y += (Math.random() - 0.5) * spread;
             direction.z += (Math.random() - 0.5) * spread;
             direction.normalize();
             
-            // Create bullet
+            console.log("Bullet direction:", direction);
+            console.log("Weapon damage:", this.damage);
+            
+            // Create bullet with exact damage
             const bullet = this.bulletSystem.createBullet(
                 startPosition, 
                 direction, 
-                60, // bullet speed
-                this.damage, 
+                100, // High speed
+                this.damage, // Exact damage (40)
                 'player'
             );
             
             if (bullet) {
-                console.log("Player bullet fired successfully");
+                console.log("Bullet created successfully:", bullet.damage, "damage");
+                console.log("Bullet physics body:", !!bullet.body);
+                console.log("Bullet mesh:", !!bullet.mesh);
+                
+                // CRITICAL: Verify bullet has collision detection enabled
+                if (bullet.body) {
+                    console.log("Bullet body collision groups:", bullet.body.collisionFilterGroup, bullet.body.collisionFilterMask);
+                    
+                    // Ensure bullet can collide with everything
+                    bullet.body.collisionFilterGroup = 1;
+                    bullet.body.collisionFilterMask = -1;
+                    
+                    console.log("Bullet collision detection enabled");
+                } else {
+                    console.error("Bullet has no physics body!");
+                }
             } else {
-                console.warn("Failed to create bullet, using raycast fallback");
-                this.performRaycast();
+                console.error("Failed to create bullet!");
             }
+            
+            console.log("==================");
             
         } catch (error) {
             console.error("Error firing bullet:", error);
-            // Fallback to raycast
-            this.performRaycast();
         }
     }
     
     performRaycast() {
-        // Fallback raycast implementation
+        // Fallback raycast implementation with exact damage
         try {
             const raycaster = new THREE.Raycaster();
             const direction = new THREE.Vector3();
@@ -216,7 +373,8 @@ class Weapon {
                     const target = intersections[0].object;
                     
                     if (typeof target.takeDamage === 'function') {
-                        target.takeDamage(this.damage);
+                        console.log(`Raycast hit with EXACTLY ${this.damage} damage`);
+                        target.takeDamage(this.damage); // Use exact weapon damage
                         console.log("Raycast hit target!");
                     }
                 }
@@ -228,30 +386,48 @@ class Weapon {
     
     createMuzzleFlash() {
         try {
+            // Remove existing muzzle flash
             if (this.muzzleFlash) {
                 this.weaponModel.remove(this.muzzleFlash);
             }
             
-            // Create muzzle flash effect
-            const flashGeometry = new THREE.SphereGeometry(0.05, 6, 4);
+            // Create bright spherical muzzle flash
+            const flashGeometry = new THREE.SphereGeometry(0.03, 8, 8);
             const flashMaterial = new THREE.MeshBasicMaterial({
-                color: 0xFFFF00,
-                emissive: 0xFFAA00,
+                color: 0xFFFFFF,
+                emissive: 0xFFFF00,
+                emissiveIntensity: 2.0,
                 transparent: true,
-                opacity: 0.8
+                opacity: 1.0
             });
             
             this.muzzleFlash = new THREE.Mesh(flashGeometry, flashMaterial);
-            this.muzzleFlash.position.set(0.3, 0, 0);
-            this.weaponModel.add(this.muzzleFlash);
             
-            // Remove flash after short time
-            setTimeout(() => {
-                if (this.muzzleFlash && this.weaponModel) {
-                    this.weaponModel.remove(this.muzzleFlash);
-                    this.muzzleFlash = null;
+            if (this.weaponBarrel) {
+                // Position at barrel tip
+                this.muzzleFlash.position.set(0.075, 0, 0);
+                this.weaponBarrel.add(this.muzzleFlash);
+            } else {
+                // Fallback position
+                this.muzzleFlash.position.set(0.08, 0.03, 0);
+                this.weaponModel.add(this.muzzleFlash);
+            }
+            
+            // Animate muzzle flash
+            let flashIntensity = 2.0;
+            const flashInterval = setInterval(() => {
+                flashIntensity -= 0.3;
+                if (flashIntensity <= 0) {
+                    if (this.muzzleFlash) {
+                        this.muzzleFlash.parent.remove(this.muzzleFlash);
+                        this.muzzleFlash = null;
+                    }
+                    clearInterval(flashInterval);
+                } else {
+                    this.muzzleFlash.material.emissiveIntensity = flashIntensity;
+                    this.muzzleFlash.material.opacity = flashIntensity / 2;
                 }
-            }, 50);
+            }, 15);
             
         } catch (error) {
             console.error("Error creating muzzle flash:", error);
@@ -289,11 +465,38 @@ class Weapon {
     }
     
     update(delta) {
-        if (this.isEquipped && this.weaponGroup) {
-            // Add slight weapon sway for realism
+        if (this.isEquipped && this.weaponGroup && this.weaponModel) {
+            // Add realistic weapon sway and movement
             const time = Date.now() * 0.001;
-            this.weaponModel.position.x = 0.3 + Math.sin(time * 2) * 0.002;
-            this.weaponModel.position.y = -0.2 + Math.cos(time * 1.5) * 0.001;
+            
+            // Breathing sway
+            this.weaponModel.position.x = 0.4 + Math.sin(time * 1.5) * 0.003;
+            this.weaponModel.position.y = -0.3 + Math.cos(time * 1.2) * 0.002;
+            
+            // Slight rotation sway
+            this.weaponModel.rotation.z = Math.sin(time * 0.8) * 0.005;
+            
+            // Ensure visibility is maintained
+            if (!this.weaponGroup.visible) {
+                console.warn("Weapon group became invisible, fixing...");
+                this.weaponGroup.visible = true;
+                this.weaponModel.visible = true;
+            }
+        }
+    }
+    
+    // Add method to force weapon visibility
+    forceVisible() {
+        if (this.weaponGroup) {
+            this.weaponGroup.visible = true;
+            this.weaponGroup.traverse((child) => {
+                if (child.isMesh) {
+                    child.visible = true;
+                    child.material.transparent = false;
+                    child.material.opacity = 1.0;
+                }
+            });
+            console.log("Forced weapon visibility");
         }
     }
     
@@ -309,4 +512,4 @@ class Weapon {
 
 // Make Weapon globally available
 window.Weapon = Weapon;
-console.log("Weapon class loaded successfully");
+console.log("Weapon class loaded with EXACT 40 damage for 4-shot enemy kills");

@@ -76,7 +76,7 @@ class DialogueSystem {
     getCriminalDialogue(npc) {
         if (npc.isHostile) {
             return {
-                text: "You're not one of us! I knew something was off about you!",
+                text: `You're not one of us! I knew something was off about you, ${this.getPlayerName()}!`,
                 options: [
                     { text: "Wait, let me explain!", action: 'plead', suspicion: 0 },
                     { text: "You got me. I'm federal.", action: 'confess', suspicion: 50 },
@@ -85,49 +85,91 @@ class DialogueSystem {
             };
         }
         
-        return {
-            text: "Hey there, haven't seen you around before. You new to the family?",
-            options: [
-                { text: "Yeah, just transferred from the east side operation.", action: 'blend', suspicion: -10, rep: 'criminals' },
-                { text: "I'm here about the big job tonight.", action: 'intel', suspicion: 5, rep: 'criminals' },
-                { text: "Actually, I'm with the police.", action: 'reveal', suspicion: 100, rep: 'criminals' },
-                { text: "Just passing through.", action: 'neutral', suspicion: 5 }
-            ]
-        };
+        const dialogues = [
+            {
+                text: "Hey there, haven't seen you around before. You new to the family?",
+                options: [
+                    { text: "Yeah, just transferred from the east side operation.", action: 'blend', suspicion: -10, rep: 'criminals' },
+                    { text: "I'm here about the big job tonight.", action: 'intel', suspicion: 5, rep: 'criminals' },
+                    { text: "Actually, I'm with the police.", action: 'reveal', suspicion: 100, rep: 'criminals' },
+                    { text: "Just passing through.", action: 'neutral', suspicion: 5 }
+                ]
+            },
+            {
+                text: "Business has been rough lately. Too many cops sniffing around.",
+                options: [
+                    { text: "Tell me more about these cops.", action: 'intel', suspicion: 0 },
+                    { text: "Maybe I can help with that problem.", action: 'offer_help', suspicion: -5, rep: 'criminals' },
+                    { text: "That's unfortunate.", action: 'neutral', suspicion: 0 },
+                    { text: "Good. The law should be enforced.", action: 'reveal', suspicion: 30 }
+                ]
+            }
+        ];
+        
+        return dialogues[Math.floor(Math.random() * dialogues.length)];
     }
     
     getPoliceDialogue(npc) {
-        return {
-            text: "Officer Martinez here. I don't recognize you. Are you new to the precinct?",
-            options: [
-                { text: "Detective Johnson, undercover division.", action: 'cover', suspicion: -5, rep: 'police' },
-                { text: "I'm working with Internal Affairs.", action: 'ia', suspicion: 10, rep: 'police' },
-                { text: "I'm not a cop.", action: 'honest', suspicion: 20 },
-                { text: "That's classified.", action: 'mysterious', suspicion: 15 }
-            ]
-        };
+        const dialogues = [
+            {
+                text: "Officer Martinez here. I don't recognize you. Are you new to the precinct?",
+                options: [
+                    { text: "Detective Johnson, undercover division.", action: 'cover', suspicion: -5, rep: 'police' },
+                    { text: "I'm working with Internal Affairs.", action: 'ia', suspicion: 10, rep: 'police' },
+                    { text: "I'm not a cop.", action: 'honest', suspicion: 20 },
+                    { text: "That's classified.", action: 'mysterious', suspicion: 15 }
+                ]
+            },
+            {
+                text: "We've been tracking criminal activity in this area. Have you seen anything suspicious?",
+                options: [
+                    { text: "I might have some information.", action: 'intel', suspicion: -10, rep: 'police' },
+                    { text: "Nothing unusual that I've noticed.", action: 'neutral', suspicion: 0 },
+                    { text: "Why would I tell you?", action: 'hostile', suspicion: 25 },
+                    { text: "Are you asking me to be a snitch?", action: 'challenge', suspicion: 15 }
+                ]
+            }
+        ];
+        
+        return dialogues[Math.floor(Math.random() * dialogues.length)];
     }
     
     getCivilianDialogue(npc) {
-        return {
-            text: "Excuse me, I've been seeing a lot of suspicious activity around here. Are you with the police?",
-            options: [
-                { text: "Yes, we're investigating. Stay safe.", action: 'police_cover', suspicion: -5, rep: 'civilians' },
-                { text: "No, just a concerned citizen like you.", action: 'civilian_cover', suspicion: 0, rep: 'civilians' },
-                { text: "Mind your own business.", action: 'rude', suspicion: 10, rep: 'civilians' },
-                { text: "What kind of activity?", action: 'investigate', suspicion: 5 }
-            ]
-        };
+        const dialogues = [
+            {
+                text: "Excuse me, I've been seeing a lot of suspicious activity around here. Are you with the police?",
+                options: [
+                    { text: "Yes, we're investigating. Stay safe.", action: 'police_cover', suspicion: -5, rep: 'civilians' },
+                    { text: "No, just a concerned citizen like you.", action: 'civilian_cover', suspicion: 0, rep: 'civilians' },
+                    { text: "Mind your own business.", action: 'rude', suspicion: 10, rep: 'civilians' },
+                    { text: "What kind of activity?", action: 'investigate', suspicion: 5 }
+                ]
+            },
+            {
+                text: "This neighborhood used to be so peaceful. Now I'm afraid to walk alone at night.",
+                options: [
+                    { text: "I understand your concerns.", action: 'sympathize', suspicion: -5, rep: 'civilians' },
+                    { text: "You should report it to the police.", action: 'advise', suspicion: 0 },
+                    { text: "It's not that bad.", action: 'dismiss', suspicion: 5 },
+                    { text: "Maybe you should move.", action: 'rude', suspicion: 10 }
+                ]
+            },
+            {
+                text: "I work at the local shop. Business has been slow with all the trouble around here.",
+                options: [
+                    { text: "What kind of trouble have you seen?", action: 'investigate', suspicion: 0 },
+                    { text: "I'm sorry to hear that.", action: 'sympathize', suspicion: -2, rep: 'civilians' },
+                    { text: "Maybe I can help protect your business.", action: 'offer_help', suspicion: -5, rep: 'civilians' },
+                    { text: "That's life in the city.", action: 'neutral', suspicion: 0 }
+                ]
+            }
+        ];
+        
+        return dialogues[Math.floor(Math.random() * dialogues.length)];
     }
     
-    getGenericDialogue() {
-        return {
-            text: "Hello there.",
-            options: [
-                { text: "Hello.", action: 'greet', suspicion: 0 },
-                { text: "Goodbye.", action: 'leave', suspicion: 0 }
-            ]
-        };
+    getPlayerName() {
+        return window.getAgentName ? window.getAgentName() : "Agent Smith";
     }
     
     showDialogue() {
@@ -211,6 +253,13 @@ class DialogueSystem {
     }
     
     endDialogue() {
+        console.log("Ending dialogue with", this.currentNPC?.name || "unknown NPC");
+        
+        // Notify the NPC that dialogue has ended
+        if (this.currentNPC && typeof this.currentNPC.endDialogue === 'function') {
+            this.currentNPC.endDialogue();
+        }
+        
         document.getElementById('dialogue-box').style.display = 'none';
         this.isActive = false;
         this.currentNPC = null;
@@ -220,6 +269,11 @@ class DialogueSystem {
         if (window.playerInstance) {
             window.playerInstance.dialogueLocked = false;
         }
+        
+        // Hide interaction prompt
+        this.hideInteractionPrompt();
+        
+        console.log("Dialogue ended and controls unlocked");
     }
     
     updateCoverStatus() {
@@ -254,20 +308,15 @@ class DialogueSystem {
                 color: white;
                 padding: 10px 20px;
                 border-radius: 5px;
+                border: 1px solid #ff3e3e;
                 z-index: 50;
+                font-family: 'Courier New', monospace;
             `;
             document.body.appendChild(prompt);
         }
         
-        prompt.textContent = `Press E to talk to ${npc.name || npc.type}`;
+        prompt.innerHTML = `Press <strong>E</strong> to talk to <span style="color: #ff3e3e;">${npc.name || npc.type}</span>`;
         prompt.style.display = 'block';
-        
-        // Auto-hide after 3 seconds
-        setTimeout(() => {
-            if (prompt.style.display === 'block') {
-                prompt.style.display = 'none';
-            }
-        }, 3000);
     }
     
     hideInteractionPrompt() {

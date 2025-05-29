@@ -76,8 +76,36 @@ class Player {
     
     setupWeapon() {
         try {
+            console.log("Setting up player weapon...");
             this.weapon = new Weapon(this.scene, this.camera, this.world);
-            console.log("Player weapon initialized");
+            
+            // Add debugging for weapon setup
+            if (this.weapon) {
+                console.log("Weapon created successfully");
+                console.log("Weapon group exists:", !!this.weapon.weaponGroup);
+                console.log("Weapon model exists:", !!this.weapon.weaponModel);
+                
+                // DO NOT auto-equip weapon - player should start with weapon holstered
+                console.log("Weapon created but remains holstered (press Tab to equip)");
+                
+                // Update ammo display to show holstered state
+                setTimeout(() => {
+                    this.weapon.updateAmmoDisplay();
+                }, 100);
+                
+                // Add periodic weapon visibility check
+                this.weaponVisibilityInterval = setInterval(() => {
+                    if (this.weapon && this.weapon.isEquipped) {
+                        if (!this.weapon.weaponGroup.visible || !this.weapon.weaponModel.visible) {
+                            console.warn("Weapon visibility lost, forcing visible...");
+                            this.weapon.forceVisible();
+                        }
+                    }
+                }, 2000); // Check every 2 seconds
+                
+            } else {
+                console.error("Failed to create weapon");
+            }
         } catch (error) {
             console.error("Error setting up weapon:", error);
         }
@@ -155,35 +183,50 @@ class Player {
         
         // Handle pointer lock changes
         const onPointerLockChange = () => {
-            if (document.pointerLockElement === document.body) {
-                this.controls.isLocked = true;
-                console.log("Pointer lock acquired successfully");
-                // Hide cursor and show game UI
-                document.body.style.cursor = 'none';
+            const isLocked = document.pointerLockElement === document.body;
+            
+            if (this.controls) {
+                this.controls.isLocked = isLocked;
+            }
+            
+            console.log("Pointer lock changed:", isLocked);
+            
+            if (isLocked) {
+                console.log("Mouse locked - WASD to move, mouse to look");
             } else {
-                this.controls.isLocked = false;
-                console.log("Pointer lock released");
-                // Show cursor
-                document.body.style.cursor = 'default';
+                console.log("Mouse unlocked - click to re-enable mouse look");
             }
         };
         
         const onPointerLockError = (event) => {
-            console.warn("Pointer lock error (this is normal):", event.type);
-            this.controls.isLocked = false;
-            // Reset cooldown on error
-            this.pointerLockCooldown = Date.now() + 1000; // 1 second cooldown
+            console.error("Pointer lock error:", event);
         };
         
-        // Add event listeners for all browsers
+        // Add event listeners for pointer lock
         document.addEventListener('pointerlockchange', onPointerLockChange);
-        document.addEventListener('pointerlockerror', onPointerLockError);
-        
-        // Vendor prefixes
         document.addEventListener('mozpointerlockchange', onPointerLockChange);
         document.addEventListener('webkitpointerlockchange', onPointerLockChange);
+        
+        document.addEventListener('pointerlockerror', onPointerLockError);
         document.addEventListener('mozpointerlockerror', onPointerLockError);
         document.addEventListener('webkitpointerlockerror', onPointerLockError);
+        
+        // Click to enable pointer lock
+        document.addEventListener('click', () => {
+            const now = Date.now();
+            if (now - this.lastPointerLockRequest > this.pointerLockCooldown && !document.pointerLockElement) {
+                this.lastPointerLockRequest = now;
+                this.pointerLockCooldown = 1000; // 1 second cooldown
+                
+                if (this.controls && typeof this.controls.lock === 'function') {
+                    try {
+                        this.controls.lock();
+                    } catch (error) {
+                        console.warn("Could not enable pointer lock:", error);
+                    }
+                }
+            }
+        });
     }
     
     setupInputHandlers() {
@@ -235,7 +278,65 @@ class Player {
             }
         };
         
-        // Handle click events for pointer lock
+        // Keyboard event handlers
+        const keyHandler = (event, pressed) => {
+            if (this.dialogueLocked) return; // Don't process movement when in dialogue
+            
+            switch (event.code) {
+                case 'KeyW':
+                    this.keys.forward = pressed;
+                    break;
+                case 'KeyS':
+                    this.keys.backward = pressed;
+                    break;
+                case 'KeyA':
+                    this.keys.left = pressed;
+                    break;
+                case 'KeyD':
+                    this.keys.right = pressed;
+                    break;
+                case 'Space':
+                    this.keys.jump = pressed;
+                    event.preventDefault();
+                    break;
+                case 'ShiftLeft':
+                case 'ShiftRight':
+                    this.keys.sprint = pressed;
+                    break;
+                case 'KeyE':
+                    this.keys.interact = pressed;
+                    if (pressed) {
+                        console.log("Interact key pressed");
+                    }
+                    break;
+            }
+        };
+        
+        // Key press handlers
+        document.addEventListener('keydown', (event) => {
+            keyHandler(event, true);
+            
+            // Handle single-press actions
+            if (event.code === 'Tab') {
+                event.preventDefault();
+                this.toggleWeapon();
+            } else if (event.code === 'KeyR') {
+                this.reloadWeapon();
+            }
+        });
+        
+        document.addEventListener('keyup', (event) => {
+            keyHandler(event, false);
+        });
+        
+        // Mouse handlers for shooting
+        document.addEventListener('mousedown', (event) => {
+            if (event.button === 0) { // Left click
+                this.fireWeapon();
+            }
+        });
+        
+        // Click events for pointer lock
         document.addEventListener('click', (event) => {
             // Only try to lock if game is active and not in dialogue
             if (!this.dialogueLocked && document.pointerLockElement !== document.body) {
@@ -258,148 +359,6 @@ class Player {
             });
         }
         
-        // KEYBOARD INPUT HANDLERS
-        
-        // Handle key down events
-        document.addEventListener('keydown', (event) => {
-            if (!this.alive) return;
-            
-            // Don't process movement if dialogue is active (except weapon controls)
-            if (this.dialogueLocked && !['KeyE', 'Tab', 'KeyR', 'Escape'].includes(event.code)) {
-                return;
-            }
-            
-            switch(event.code) {
-                case 'KeyW':
-                case 'ArrowUp':
-                    if (!this.dialogueLocked) {
-                        this.keys.forward = true;
-                        // Auto-request pointer lock when starting to move
-                        if (!document.pointerLockElement) {
-                            setTimeout(() => requestPointerLockSafely(), 100);
-                        }
-                    }
-                    event.preventDefault();
-                    break;
-                case 'KeyS':
-                case 'ArrowDown':
-                    if (!this.dialogueLocked) this.keys.backward = true;
-                    event.preventDefault();
-                    break;
-                case 'KeyA':
-                case 'ArrowLeft':
-                    if (!this.dialogueLocked) this.keys.left = true;
-                    event.preventDefault();
-                    break;
-                case 'KeyD':
-                case 'ArrowRight':
-                    if (!this.dialogueLocked) this.keys.right = true;
-                    event.preventDefault();
-                    break;
-                case 'Space':
-                    if (!this.dialogueLocked) this.keys.jump = true;
-                    event.preventDefault();
-                    break;
-                case 'ShiftLeft': 
-                case 'ShiftRight': 
-                    if (!this.dialogueLocked) this.keys.sprint = true;
-                    event.preventDefault();
-                    break;
-                case 'KeyE':
-                    this.keys.interact = true;
-                    this.handleInteraction();
-                    event.preventDefault();
-                    break;
-                case 'Escape':
-                    // Release pointer lock on Escape
-                    if (document.pointerLockElement === document.body) {
-                        document.exitPointerLock();
-                    }
-                    event.preventDefault();
-                    break;
-                case 'Tab':
-                    // Toggle weapon - FIX: Make sure this works properly
-                    if (this.weapon) {
-                        console.log(`Current weapon state: ${this.weapon.isEquipped ? 'equipped' : 'holstered'}`);
-                        if (this.weapon.isEquipped) {
-                            this.weapon.holster();
-                            console.log("Weapon holstered via Tab key");
-                        } else {
-                            this.weapon.equip();
-                            console.log("Weapon equipped via Tab key");
-                        }
-                    } else {
-                        console.log("No weapon available to toggle");
-                    }
-                    event.preventDefault();
-                    break;
-                case 'KeyR':
-                    // Reload weapon
-                    if (this.weapon && this.weapon.isEquipped) {
-                        this.weapon.reload();
-                    }
-                    event.preventDefault();
-                    break;
-            }
-            
-            if (this.debug && event.code === 'KeyP') {
-                // Debug key
-                console.log("=== PLAYER DEBUG INFO ===");
-                console.log("Position:", this.body.position);
-                console.log("Velocity:", this.body.velocity);
-                console.log("Movement states:", this.keys);
-                console.log("On ground:", this.onGround);
-                console.log("Pointer lock:", document.pointerLockElement === document.body);
-                console.log("Controls locked:", this.controls.isLocked);
-                if (this.weapon) {
-                    console.log("Weapon equipped:", this.weapon.isEquipped);
-                    console.log("Weapon ammo:", this.weapon.currentAmmo + "/" + this.weapon.maxAmmo);
-                }
-                console.log("========================");
-            }
-        });
-        
-        // Handle key up events
-        document.addEventListener('keyup', (event) => {
-            switch(event.code) {
-                case 'KeyW':
-                case 'ArrowUp':
-                    this.keys.forward = false;
-                    break;
-                case 'KeyS':
-                case 'ArrowDown':
-                    this.keys.backward = false;
-                    break;
-                case 'KeyA':
-                case 'ArrowLeft':
-                    this.keys.left = false;
-                    break;
-                case 'KeyD':
-                case 'ArrowRight':
-                    this.keys.right = false;
-                    break;
-                case 'Space':
-                    this.keys.jump = false;
-                    break;
-                case 'ShiftLeft': 
-                case 'ShiftRight': 
-                    this.keys.sprint = false;
-                    break;
-                case 'KeyE':
-                    this.keys.interact = false;
-                    break;
-                // Don't handle Tab in keyup to avoid conflicts
-            }
-        });
-        
-        // Handle mouse events for weapon firing
-        document.addEventListener('mousedown', (event) => {
-            if (event.button === 0 && this.weapon && this.weapon.isEquipped && document.pointerLockElement === document.body) {
-                // Left click to fire
-                this.weapon.fire();
-            }
-        });
-        
         // Show helpful messages
         console.log("Input handlers initialized");
         console.log("Controls: W/A/S/D to move, Space to jump, Shift to sprint, E to interact");
@@ -407,18 +366,57 @@ class Player {
         console.log("Click in the game area to enable mouse look (Escape to release)");
     }
     
-    handleInteraction() {
-        if (!window.game || !window.game.npcManager || !window.game.dialogueSystem) return;
-        
-        const playerPos = this.body.position;
-        const nearestNPC = window.game.npcManager.getNearestNPC(playerPos, 3);
-        
-        if (nearestNPC.npc && nearestNPC.distance < 3) {
-            console.log("Interacting with", nearestNPC.npc.name);
-            window.game.dialogueSystem.startDialogue(nearestNPC.npc);
-        } else {
-            console.log("No NPC nearby to interact with");
+    toggleWeapon() {
+        if (!this.weapon) {
+            console.warn("No weapon available to toggle");
+            return;
         }
+        
+        if (this.weapon.isEquipped) {
+            console.log("Holstering weapon...");
+            this.weapon.holster();
+            
+            // Reduce cover loss when weapon is holstered
+            if (window.game && window.game.coverSystem) {
+                window.game.coverSystem.modifyCover(10); // Small cover boost for holstering
+            }
+        } else {
+            console.log("Equipping weapon...");
+            this.weapon.equip();
+            
+            // Weapon visibility reduces cover
+            if (window.game && window.game.coverSystem) {
+                window.game.coverSystem.modifyCover(-20); // Immediate cover loss for drawing weapon
+            }
+        }
+    }
+    
+    fireWeapon() {
+        if (!this.weapon || !this.weapon.isEquipped) {
+            return; // Can't fire if weapon not equipped
+        }
+        
+        if (this.dialogueLocked) {
+            return; // Can't fire during dialogue
+        }
+        
+        if (this.weapon.fire()) {
+            console.log("Player fired weapon");
+            
+            // Firing weapon severely damages cover
+            if (window.game && window.game.coverSystem) {
+                window.game.coverSystem.modifyCover(-30); // Major cover loss for firing
+                console.log("Cover blown by gunfire!");
+            }
+        }
+    }
+    
+    reloadWeapon() {
+        if (!this.weapon || !this.weapon.isEquipped) {
+            return;
+        }
+        
+        this.weapon.reload();
     }
     
     update(delta) {
@@ -568,6 +566,15 @@ class Player {
         this.body.position.set(0, 5, 0);
         this.body.velocity.set(0, 0, 0);
         console.log("Player position reset");
+    }
+    
+    destroy() {
+        // Clean up weapon visibility interval
+        if (this.weaponVisibilityInterval) {
+            clearInterval(this.weaponVisibilityInterval);
+        }
+        
+        // ...existing cleanup code...
     }
 }
 

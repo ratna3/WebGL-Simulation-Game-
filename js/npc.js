@@ -14,9 +14,24 @@ class NPC {
         this.maxHealth = 100;
         this.isDead = false;
         
+        // Add walking animation properties
+        this.isWalking = true;
+        this.walkSpeed = 0.8;
+        this.walkRadius = 8; // Radius of circular walking pattern
+        this.walkAngle = Math.random() * Math.PI * 2; // Random starting angle
+        this.walkCenter = { x: position.x, z: position.z }; // Center of walking circle
+        this.lastPositionUpdate = 0;
+        
+        // Dialogue interaction properties
+        this.canTalk = true;
+        this.dialogueCooldown = 0;
+        this.lastInteractionTime = 0;
+        
         // Use character design system
         this.characterDesign = new CharacterDesign();
         this.name = this.characterDesign.generateCharacterName(type);
+        
+        console.log(`${type} NPC created: ${this.name} - will walk in circles and can be talked to`);
     }
     
     init() {
@@ -98,22 +113,152 @@ class NPC {
     }
     
     update(playerPosition, delta) {
-        // Update mesh position
+        if (this.isDead) return;
+        
+        // Update walking animation
+        this.updateWalkingAnimation(delta);
+        
+        // Update mesh position to match physics body
         if (this.body) {
             this.group.position.copy(this.body.position);
             this.group.position.y -= 0.8;
         }
         
-        // Check for player interaction
+        // Check for player interaction with improved distance checking
         if (playerPosition && window.game && window.game.dialogueSystem) {
             const distance = this.getDistanceToPlayer(playerPosition);
-            window.game.dialogueSystem.checkInteraction(this, distance);
+            
+            // Show interaction prompt when player is close
+            if (distance < 4 && this.canTalk && !window.game.dialogueSystem.isActive) {
+                window.game.dialogueSystem.showInteractionPrompt(this);
+                
+                // Store reference for interaction
+                window.currentInteractableNPC = this;
+            } else if (distance > 4 && window.currentInteractableNPC === this) {
+                window.game.dialogueSystem.hideInteractionPrompt();
+                window.currentInteractableNPC = null;
+            }
         }
         
         // Simple AI behavior if hostile
         if (this.isHostile && playerPosition) {
             this.hostileBehavior(playerPosition, delta);
         }
+        
+        // Update dialogue cooldown
+        if (this.dialogueCooldown > 0) {
+            this.dialogueCooldown -= delta * 1000;
+        }
+    }
+    
+    updateWalkingAnimation(delta) {
+        if (!this.isWalking || this.isHostile || this.isDead) return;
+        
+        const now = Date.now();
+        if (now - this.lastPositionUpdate < 50) return; // Throttle updates
+        this.lastPositionUpdate = now;
+        
+        // Update walking angle for circular movement
+        this.walkAngle += delta * this.walkSpeed;
+        
+        // Calculate new position in circle
+        const targetX = this.walkCenter.x + Math.cos(this.walkAngle) * this.walkRadius;
+        const targetZ = this.walkCenter.z + Math.sin(this.walkAngle) * this.walkRadius;
+        
+        // Move physics body toward target position
+        if (this.body) {
+            const currentX = this.body.position.x;
+            const currentZ = this.body.position.z;
+            
+            // Calculate movement direction
+            const dirX = targetX - currentX;
+            const dirZ = targetZ - currentZ;
+            const distance = Math.sqrt(dirX * dirX + dirZ * dirZ);
+            
+            if (distance > 0.1) {
+                // Normalize and apply movement
+                const moveSpeed = 2.0;
+                this.body.velocity.x = (dirX / distance) * moveSpeed;
+                this.body.velocity.z = (dirZ / distance) * moveSpeed;
+                
+                // Make NPC face movement direction
+                const angle = Math.atan2(dirX, dirZ);
+                this.group.rotation.y = angle;
+                
+                // Trigger walking animation if character design supports it
+                if (this.characterDesign && this.characterDesign.animateCharacter) {
+                    this.characterDesign.animateCharacter(this.group, 'walk');
+                }
+            } else {
+                // Stop movement when close to target
+                this.body.velocity.x = 0;
+                this.body.velocity.z = 0;
+                
+                // Trigger idle animation
+                if (this.characterDesign && this.characterDesign.animateCharacter) {
+                    this.characterDesign.animateCharacter(this.group, 'idle');
+                }
+            }
+        }
+    }
+    
+    // Method to start dialogue interaction
+    startDialogue() {
+        if (!this.canTalk || this.dialogueCooldown > 0 || this.isDead) {
+            console.log(`Cannot talk to ${this.name}: cooldown or dead`);
+            return false;
+        }
+        
+        if (window.game && window.game.dialogueSystem) {
+            console.log(`Starting dialogue with ${this.name} (${this.type})`);
+            
+            // Stop walking during dialogue
+            this.isWalking = false;
+            if (this.body) {
+                this.body.velocity.x = 0;
+                this.body.velocity.z = 0;
+            }
+            
+            // Start dialogue
+            window.game.dialogueSystem.startDialogue(this);
+            
+            // Set cooldown to prevent spam
+            this.dialogueCooldown = 3000; // 3 second cooldown
+            this.lastInteractionTime = Date.now();
+            
+            return true;
+        }
+        
+        console.error("Dialogue system not available");
+        return false;
+    }
+    
+    // Method called when dialogue ends
+    endDialogue() {
+        console.log(`Dialogue ended with ${this.name}`);
+        
+        // Resume walking after a short delay
+        setTimeout(() => {
+            if (!this.isHostile && !this.isDead) {
+                this.isWalking = true;
+                console.log(`${this.name} resumes walking`);
+            }
+        }, 1000);
+    }
+    
+    becomeHostile() {
+        if (this.isHostile) return;
+        
+        this.isHostile = true;
+        this.isWalking = false; // Stop walking when hostile
+        console.log(`${this.name} becomes hostile!`);
+        
+        // Change appearance to show hostility (red tint)
+        this.group.traverse((child) => {
+            if (child.material) {
+                child.material.emissive = new THREE.Color(0x440000);
+            }
+        });
     }
     
     takeDamage(damage) {
@@ -211,20 +356,6 @@ class NPC {
         }
     }
     
-    becomeHostile() {
-        if (this.isHostile) return;
-        
-        this.isHostile = true;
-        console.log(`${this.name} becomes hostile!`);
-        
-        // Change appearance to show hostility (red tint)
-        this.group.traverse((child) => {
-            if (child.material) {
-                child.material.emissive = new THREE.Color(0x440000);
-            }
-        });
-    }
-    
     getDistanceToPlayer(playerPosition) {
         return Math.sqrt(
             Math.pow(playerPosition.x - this.body.position.x, 2) +
@@ -239,22 +370,26 @@ class Enemy {
         this.world = world;
         this.position = position || { x: 5, y: 0, z: 5 };
         
-        // Enemy properties
-        this.health = 150;
-        this.maxHealth = 150;
+        // Add unique identifier for debugging
+        this.id = 'enemy_' + Math.random().toString(36).substr(2, 9);
+        this.name = this.generateEnemyName();
+        
+        // Enemy properties - CRITICAL: Exactly 160 health for 4-shot kills with 40 damage bullets
+        this.health = 160;
+        this.maxHealth = 160;
         this.speed = 2;
-        this.attackDamage = 25; // 4 hits to kill player (100 health / 25 damage)
-        this.detectionRange = 15; // Increased detection range
+        this.attackDamage = 25;
+        this.detectionRange = 15;
         this.attackRange = 2;
         this.isDead = false;
         
         // Weapon properties
         this.hasWeapon = true;
-        this.ammo = 10; // More ammo
-        this.weaponRange = 20; // Longer range
+        this.ammo = 15;
+        this.weaponRange = 20;
         this.lastShotTime = 0;
-        this.shotCooldown = 1000; // Faster shooting (1 second)
-        this.accuracy = 0.8; // 80% accuracy
+        this.shotCooldown = 1200;
+        this.accuracy = 0.7;
         
         // 3D objects
         this.mesh = null;
@@ -262,24 +397,99 @@ class Enemy {
         this.group = new THREE.Group();
         this.weaponGroup = new THREE.Group();
         
-        // AI state
+        // AI state - Enhanced for animations and cover system
         this.state = 'patrol';
+        this.previousState = 'patrol';
         this.target = null;
         this.lastAttackTime = 0;
         this.attackCooldown = 2000;
         this.playerDetected = false;
         
+        // Enhanced movement for automatic patrolling
+        this.patrolPoints = [];
+        this.currentPatrolIndex = 0;
+        this.patrolRadius = 25; // Larger patrol area
+        this.lastPatrolUpdate = 0;
+        this.patrolUpdateInterval = 5000; // Change direction every 5 seconds
+        this.isMoving = true; // Always moving unless attacking
+        this.patrolSpeed = 0.8; // Patrol movement speed
+        
+        // Cover system integration
+        this.coverThreshold = 60; // Attack when player cover below 60%
+        this.suspicionLevel = 0;
+        this.maxSuspicion = 100;
+        this.suspicionDecayRate = 5; // Suspicion decreases over time
+        
+        // Animation integration
+        this.animationManager = null;
+        
         // Use character design system
         this.characterDesign = new CharacterDesign();
         
+        console.log(`Enemy ${this.name} created with ID: ${this.id}, Health: ${this.health} - will die in exactly 4 shots (40 damage each)`);
+        console.log(`Enemy will attack when player cover drops below ${this.coverThreshold}%`);
         this.init();
     }
     
+    generateEnemyName() {
+        const names = [
+            "REPO-Alpha", "REPO-Bravo", "REPO-Charlie", "REPO-Delta", 
+            "REPO-Echo", "REPO-Foxtrot", "REPO-Golf", "REPO-Hotel",
+            "REPO-India", "REPO-Juliet", "REPO-Kilo", "REPO-Lima"
+        ];
+        return names[Math.floor(Math.random() * names.length)] + "-" + Math.floor(Math.random() * 100);
+    }
+
     init() {
         this.createRepoCharacter();
         this.createPhysicsBody();
         this.scene.add(this.group);
+        
+        // Initialize patrol route with multiple points
+        this.generatePatrolRoute();
+        
+        // Register with animation manager if available
+        if (window.game && window.game.animationManager) {
+            this.animationManager = window.game.animationManager;
+            this.animationManager.registerEnemy(this);
+        }
+        
         console.log("REPO enemy created at position:", this.position);
+        console.log("Patrol route generated with", this.patrolPoints.length, "points");
+    }
+    
+    generatePatrolRoute() {
+        // Create a patrol route around the spawn area
+        const numPoints = 4 + Math.floor(Math.random() * 4); // 4-8 patrol points
+        this.patrolPoints = [];
+        
+        for (let i = 0; i < numPoints; i++) {
+            const angle = (i / numPoints) * Math.PI * 2;
+            const radius = this.patrolRadius * (0.5 + Math.random() * 0.5); // Vary distance
+            
+            const patrolPoint = {
+                x: this.position.x + Math.cos(angle) * radius,
+                z: this.position.z + Math.sin(angle) * radius,
+                waitTime: 1000 + Math.random() * 3000 // Wait 1-4 seconds at each point
+            };
+            
+            this.patrolPoints.push(patrolPoint);
+        }
+        
+        // Add some random patrol points for variety
+        for (let i = 0; i < 2; i++) {
+            const randomAngle = Math.random() * Math.PI * 2;
+            const randomRadius = Math.random() * this.patrolRadius;
+            
+            this.patrolPoints.push({
+                x: this.position.x + Math.cos(randomAngle) * randomRadius,
+                z: this.position.z + Math.sin(randomAngle) * randomRadius,
+                waitTime: 2000 + Math.random() * 2000
+            });
+        }
+        
+        this.currentPatrolIndex = 0;
+        console.log(`Generated patrol route with ${this.patrolPoints.length} points for enemy`);
     }
     
     createRepoCharacter() {
@@ -321,290 +531,73 @@ class Enemy {
         this.group.position.copy(this.body.position);
         this.group.position.y -= 0.9; // Adjust for center offset
         
-        // Simple AI behavior
+        // Store previous state for animation changes
+        this.previousState = this.state;
+        
+        // Update suspicion level (decay over time)
+        if (this.suspicionLevel > 0 && !this.playerDetected) {
+            this.suspicionLevel = Math.max(0, this.suspicionLevel - (this.suspicionDecayRate * delta));
+        }
+        
+        // AI behavior and movement
         this.updateAI(playerPosition, delta);
+        
+        // Update animations based on state
+        this.updateAnimations();
         
         // Keep enemy upright
         this.body.angularVelocity.set(0, 0, 0);
     }
     
-    updateAI(playerPosition, delta) {
-        const distanceToPlayer = this.getDistanceToPlayer(playerPosition);
-        
-        // Check if player has weapon equipped (makes them more detectable)
-        const playerHasWeapon = window.game && window.game.player && window.game.player.weapon && window.game.player.weapon.isEquipped;
-        const detectionMultiplier = playerHasWeapon ? 1.5 : 1.0;
-        const adjustedDetectionRange = this.detectionRange * detectionMultiplier;
-        
-        // State machine
-        switch(this.state) {
-            case 'patrol':
-                if (distanceToPlayer < adjustedDetectionRange) {
-                    this.state = 'chase';
-                    this.playerDetected = true;
-                    console.log("Enemy detected player - switching to chase");
-                }
-                break;
-                
-            case 'chase':
-                if (distanceToPlayer > adjustedDetectionRange * 2) {
-                    this.state = 'patrol';
-                    this.playerDetected = false;
-                } else if (distanceToPlayer < this.weaponRange && this.ammo > 0) {
-                    this.state = 'shoot';
-                } else if (distanceToPlayer < this.attackRange) {
-                    this.state = 'attack';
-                } else {
-                    this.moveTowardsPlayer(playerPosition, delta);
-                }
-                break;
-                
-            case 'shoot':
-                if (distanceToPlayer > this.weaponRange || this.ammo <= 0) {
-                    this.state = 'chase';
-                } else {
-                    this.shootAtPlayer(playerPosition);
-                }
-                break;
-                
-            case 'attack':
-                if (distanceToPlayer > this.attackRange) {
-                    this.state = 'chase';
-                } else {
-                    this.attackPlayer();
-                }
-                break;
-        }
-    }
-    
-    moveTowardsPlayer(playerPosition, delta) {
-        // Calculate direction to player
-        const direction = new THREE.Vector3(
-            playerPosition.x - this.body.position.x,
-            0,
-            playerPosition.z - this.body.position.z
-        ).normalize();
-        
-        // Apply movement force
-        const force = this.speed * delta * 100;
-        this.body.velocity.x = direction.x * force;
-        this.body.velocity.z = direction.z * force;
-        
-        // Make enemy face the player
-        const angle = Math.atan2(direction.x, direction.z);
-        this.group.rotation.y = angle;
-    }
-    
-    attackPlayer() {
-        const now = Date.now();
-        if (now - this.lastAttackTime > this.attackCooldown) {
-            console.log("Enemy attacks player for", this.attackDamage, "damage!");
-            this.lastAttackTime = now;
-            
-            // Here you could trigger damage to player
-            if (window.playerInstance) {
-                // You can add player damage logic here
-            }
-        }
-    }
-    
-    shootAtPlayer(playerPosition) {
-        const now = Date.now();
-        if (now - this.lastShotTime > this.shotCooldown && this.ammo > 0) {
-            this.ammo--;
-            this.lastShotTime = now;
-            
-            // Face player when shooting
-            const direction = new THREE.Vector3(
-                playerPosition.x - this.body.position.x,
-                0,
-                playerPosition.z - this.body.position.z
-            ).normalize();
-            const angle = Math.atan2(direction.x, direction.z);
-            this.group.rotation.y = angle;
-            
-            // Use bullet system if available
-            if (window.game && window.game.bulletSystem) {
-                // Calculate shooting position from enemy weapon
-                const shootPosition = new THREE.Vector3();
-                shootPosition.copy(this.body.position);
-                shootPosition.y += 1.2; // Shoulder height
-                shootPosition.x += direction.x * 0.5; // Move forward a bit
-                shootPosition.z += direction.z * 0.5;
-                
-                // Calculate target position with some prediction
-                const targetPos = new THREE.Vector3();
-                targetPos.copy(playerPosition);
-                targetPos.y += 1; // Aim at player torso
-                
-                // Calculate direction to target
-                const shootDirection = new THREE.Vector3();
-                shootDirection.subVectors(targetPos, shootPosition).normalize();
-                
-                // Add some inaccuracy to enemy shots
-                const inaccuracy = 0.1;
-                shootDirection.x += (Math.random() - 0.5) * inaccuracy;
-                shootDirection.y += (Math.random() - 0.5) * inaccuracy;
-                shootDirection.z += (Math.random() - 0.5) * inaccuracy;
-                shootDirection.normalize();
-                
-                // Create enemy bullet
-                const bullet = window.game.bulletSystem.createBullet(
-                    shootPosition, 
-                    shootDirection, 
-                    40, // enemy bullet speed
-                    25, // damage
-                    'enemy'
-                );
-                
-                if (bullet) {
-                    console.log(`Enemy shoots at player! Ammo left: ${this.ammo}`);
-                    this.createMuzzleFlash();
-                } else {
-                    console.warn("Failed to create enemy bullet, using fallback");
-                    this.fallbackShoot(playerPosition);
-                }
-            } else {
-                console.warn("Bullet system not available, using fallback");
-                this.fallbackShoot(playerPosition);
-            }
-            
-            if (this.ammo <= 0) {
-                console.log("Enemy out of ammo!");
-            }
-        }
-    }
-    
-    createMuzzleFlash() {
-        try {
-            if (!this.weaponGroup) {
-                console.warn("No weapon group available for muzzle flash");
-                return;
-            }
-            
-            // Remove existing muzzle flash
-            if (this.muzzleFlash) {
-                this.weaponGroup.remove(this.muzzleFlash);
-            }
-            
-            // Create muzzle flash effect
-            const flashGeometry = new THREE.SphereGeometry(0.08, 6, 4);
-            const flashMaterial = new THREE.MeshBasicMaterial({
-                color: 0xFFFF00,
-                emissive: 0xFFAA00,
-                transparent: true,
-                opacity: 0.9
-            });
-            
-            this.muzzleFlash = new THREE.Mesh(flashGeometry, flashMaterial);
-            this.muzzleFlash.position.set(0, 0, 0.5); // At barrel tip
-            this.weaponGroup.add(this.muzzleFlash);
-            
-            // Remove flash after short time
-            setTimeout(() => {
-                if (this.muzzleFlash && this.weaponGroup) {
-                    this.weaponGroup.remove(this.muzzleFlash);
-                    this.muzzleFlash = null;
-                }
-            }, 80);
-            
-        } catch (error) {
-            console.error("Error creating enemy muzzle flash:", error);
-        }
-    }
-    
-    // Add missing createHitEffect method
-    createHitEffect(targetPosition) {
-        try {
-            // Create hit spark effect at target position
-            const sparkGeometry = new THREE.SphereGeometry(0.1, 8, 6);
-            const sparkMaterial = new THREE.MeshBasicMaterial({
-                color: 0xFF4444,
-                emissive: 0xFF2222,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
-            spark.position.copy(targetPosition);
-            this.scene.add(spark);
-            
-            // Remove spark after short time
-            setTimeout(() => {
-                this.scene.remove(spark);
-            }, 200);
-            
-        } catch (error) {
-            console.error("Error creating hit effect:", error);
-        }
-    }
-    
-    // Add missing damagePlayer method
-    damagePlayer() {
-        try {
-            if (window.game && typeof window.game.playerTakeDamage === 'function') {
-                window.game.playerTakeDamage(this.attackDamage);
-                console.log(`Enemy hits player for ${this.attackDamage} damage!`);
-            } else {
-                console.warn("Game damage system not available");
-            }
-        } catch (error) {
-            console.error("Error damaging player:", error);
-        }
-    }
-    
-    fallbackShoot(playerPosition) {
-        // Fallback shooting method without bullet system
-        try {
-            this.createMuzzleFlash();
-            
-            const hitRoll = Math.random();
-            if (hitRoll < this.accuracy) {
-                console.log(`Enemy shoots player! Ammo left: ${this.ammo}`);
-                this.damagePlayer();
-                this.createHitEffect(playerPosition);
-            } else {
-                console.log(`Enemy missed! Ammo left: ${this.ammo}`);
-            }
-        } catch (error) {
-            console.error("Error in fallback shoot:", error);
-        }
-    }
-    
     takeDamage(damage) {
-        if (this.isDead) return false;
+        if (this.isDead) {
+            console.log("Enemy already dead, ignoring damage");
+            return false;
+        }
         
-        this.health -= damage;
-        console.log(`REPO Enemy takes ${damage} damage. Health: ${this.health}/${this.maxHealth}`);
+        // Convert damage to number and ensure it's exactly what we expect
+        const actualDamage = Number(damage);
+        const oldHealth = this.health;
         
-        // Visual damage effect
-        this.group.traverse((child) => {
-            if (child.material && child.material.emissive) {
-                child.material.emissive.setHex(0x440000);
-                setTimeout(() => {
-                    if (!this.isDead) {
-                        child.material.emissive.setHex(0x000000);
-                    }
-                }, 200);
-            }
-        });
+        this.health -= actualDamage;
+        
+        console.log(`=== ENEMY DAMAGE TRACKING ===`);
+        console.log(`Damage received: ${actualDamage}`);
+        console.log(`Health before: ${oldHealth}`);
+        console.log(`Health after: ${this.health}`);
+        console.log(`Shots taken: ${Math.ceil((this.maxHealth - this.health) / 40)}`);
+        console.log(`Shots remaining: ${Math.ceil(this.health / 40)}`);
+        console.log(`===========================`);
+        
+        // Trigger hit animation
+        if (this.animationManager) {
+            this.animationManager.playHitAnimation(this);
+        }
         
         // Immediately become aggressive when shot
         if (!this.playerDetected) {
             this.playerDetected = true;
             this.state = 'chase';
+            this.suspicionLevel = this.maxSuspicion;
+            console.log("Enemy becomes aggressive after being shot!");
+            this.alertNearbyEnemies();
         }
         
+        // Check for death - exactly at 0 or below
         if (this.health <= 0) {
+            console.log(`=== ENEMY KILLED ===`);
+            console.log(`Total shots taken: ${Math.ceil(this.maxHealth / actualDamage)}`);
+            console.log(`Damage per shot: ${actualDamage}`);
+            console.log(`================`);
             this.die();
-            return true; // Killed
+            return true;
         }
         
         // Become more aggressive when damaged
-        this.detectionRange = Math.min(this.detectionRange + 2, 30);
-        this.speed = Math.min(this.speed + 0.5, 5);
+        this.detectionRange = Math.min(this.detectionRange + 3, 35);
+        this.speed = Math.min(this.speed + 0.8, 6);
         
-        // If enemy has ammo, prefer shooting over chasing
+        // Prefer shooting if has ammo
         if (this.ammo > 0 && this.state === 'chase') {
             this.state = 'shoot';
         }
@@ -615,38 +608,176 @@ class Enemy {
     die() {
         if (this.isDead) return;
         
+        console.log(`=== ${this.name} DEATH ===`);
         this.isDead = true;
         this.health = 0;
-        console.log("REPO Enemy eliminated!");
         
         // Notify mission manager
         if (window.game && window.game.missionManager) {
             window.game.missionManager.enemyEliminated();
         }
         
-        // Death animation - fall over
-        this.group.rotation.z = Math.PI / 2;
+        // Death animation
+        this.group.rotation.z = Math.PI / 2; // Fall over
         this.group.position.y -= 0.5;
         
-        // Change color to indicate death
+        // Change appearance
         this.group.traverse((child) => {
-            if (child.material) {
-                child.material.color.multiplyScalar(0.3);
+            if (child.isMesh && child.material) {
+                child.material.color.multiplyScalar(0.5); // Darken
                 child.material.emissive.setHex(0x000000);
             }
         });
         
-        // Remove physics body
-        if (this.body && this.world) {
+        // Remove physics body immediately to prevent further collisions
+        if (this.body) {
             this.world.removeBody(this.body);
+            this.body = null;
         }
         
-        // Remove from scene after a delay
+        // Remove from scene after delay
         setTimeout(() => {
-            if (this.scene && this.group) {
+            if (this.group && this.group.parent) {
                 this.scene.remove(this.group);
             }
         }, 5000);
+        
+        console.log(`${this.name} eliminated`);
+    }
+
+    // CRITICAL: Add the missing getDistanceToPlayer method
+    getDistanceToPlayer(playerPosition) {
+        if (!playerPosition || !this.body) {
+            return Infinity;
+        }
+        
+        return Math.sqrt(
+            Math.pow(playerPosition.x - this.body.position.x, 2) +
+            Math.pow(playerPosition.z - this.body.position.z, 2)
+        );
+    }
+
+    updateAI(playerPosition, delta) {
+        if (!playerPosition) return;
+        
+        const distanceToPlayer = this.getDistanceToPlayer(playerPosition);
+        
+        // Get player cover level from game
+        const playerCover = this.getPlayerCoverLevel();
+        
+        // Determine detection based on cover level and distance
+        const coverDetection = this.calculateCoverDetection(playerCover, distanceToPlayer);
+        
+        // Enhanced detection system
+        const baseDetectionRange = this.detectionRange;
+        let adjustedDetectionRange = baseDetectionRange;
+        
+        // Cover-based detection
+        if (playerCover < this.coverThreshold) {
+            // Cover is blown - much easier to detect
+            adjustedDetectionRange *= 2.0;
+            this.suspicionLevel = Math.min(this.maxSuspicion, this.suspicionLevel + (50 * delta));
+            console.log(`Player cover blown (${playerCover}%) - enemy on high alert!`);
+        } else if (playerCover < 80) {
+            // Suspicion rising
+            adjustedDetectionRange *= 1.3;
+            this.suspicionLevel = Math.min(this.maxSuspicion, this.suspicionLevel + (20 * delta));
+        }
+        
+        // Weapon visibility increases detection
+        const playerHasWeapon = window.game && window.game.player && window.game.player.weapon && window.game.player.weapon.isEquipped;
+        if (playerHasWeapon) {
+            adjustedDetectionRange *= 1.5;
+            this.suspicionLevel = Math.min(this.maxSuspicion, this.suspicionLevel + (30 * delta));
+            console.log("Enemy notices player's weapon - increased suspicion");
+        }
+        
+        // Reset movement flag
+        this.isMoving = false;
+        
+        // State machine with enhanced movement and cover detection
+        switch(this.state) {
+            case 'patrol':
+                this.handlePatrolState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta, playerCover);
+                break;
+                
+            case 'investigate':
+                this.handleInvestigateState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta);
+                break;
+                
+            case 'chase':
+                this.handleChaseState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta);
+                break;
+                
+            case 'shoot':
+                this.handleShootState(playerPosition, distanceToPlayer, delta);
+                break;
+                
+            case 'attack':
+                this.handleAttackState(playerPosition, distanceToPlayer, delta);
+                break;
+        }
+    }
+
+    handleChaseState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta) {
+        if (distanceToPlayer > adjustedDetectionRange * 2.5) {
+            this.state = 'patrol';
+            this.playerDetected = false;
+            this.suspicionLevel = Math.max(0, this.suspicionLevel - 30);
+            console.log("Enemy lost player - returning to patrol");
+        } else if (distanceToPlayer < this.weaponRange && this.ammo > 0) {
+            this.state = 'shoot';
+            console.log(`${this.name} switches to shooting mode`);
+        } else {
+            // Chase player
+            this.moveTowardsTarget(playerPosition, delta, this.speed);
+            this.isMoving = true;
+        }
+    }
+    
+    handleShootState(playerPosition, distanceToPlayer, delta) {
+        if (distanceToPlayer > this.weaponRange || this.ammo <= 0) {
+            this.state = 'chase';
+        } else {
+            // Shoot at player
+            this.shootAtPlayer(playerPosition);
+        }
+    }
+    
+    handleAttackState(playerPosition, distanceToPlayer, delta) {
+        if (distanceToPlayer > this.attackRange) {
+            this.state = 'chase';
+        } else {
+            // Melee attack
+            this.attackPlayer();
+        }
+    }
+
+    shootAtPlayer(playerPosition) {
+        const now = Date.now();
+        if (now - this.lastShotTime < this.shotCooldown || this.ammo <= 0) return;
+        
+        this.lastShotTime = now;
+        this.ammo--;
+        
+        console.log(`${this.name} shoots at player! Ammo remaining: ${this.ammo}`);
+        
+        // Use bullet system to create enemy bullet
+        if (window.game && window.game.bulletSystem) {
+            window.game.bulletSystem.createEnemyBullet(this, playerPosition);
+        }
+    }
+    
+    attackPlayer() {
+        const now = Date.now();
+        if (now - this.lastAttackTime < this.attackCooldown) return;
+        
+        this.lastAttackTime = now;
+        console.log(`${this.name} attacks player with melee!`);
+        
+        if (window.game && window.game.playerTakeDamage) {
+            window.game.playerTakeDamage(this.attackDamage);
+        }
     }
 }
 
@@ -709,53 +840,38 @@ class NPCManager {
         return position;
     }
     
-    spawnEnemiesInParks() {
-        // Get park and tree locations from environment
+    spawnEnemiesNearParks() {
+        // Get park locations from environment
         const environment = window.game.environment;
-        if (!environment) return;
+        if (!environment) {
+            console.warn("Environment not available for enemy spawning");
+            return this.spawnEnemiesRandomly();
+        }
         
-        const treeLocations = environment.getTreeLocations();
         const parkLocations = environment.getParkLocations();
         
-        // Spawn enemies in parks and near trees
-        const enemyCount = Math.min(8, Math.max(5, treeLocations.length)); // 5-8 enemies
+        if (!parkLocations || parkLocations.length === 0) {
+            console.warn("No park locations found, spawning enemies randomly");
+            return this.spawnEnemiesRandomly();
+        }
         
-        console.log(`Spawning ${enemyCount} REPO enemies in parks`);
+        const enemyCount = Math.min(10, Math.max(6, parkLocations.length * 2)); // 6-10 enemies
+        
+        console.log(`Spawning ${enemyCount} REPO enemies near ${parkLocations.length} parks`);
         
         for (let i = 0; i < enemyCount; i++) {
-            let enemyPosition;
+            const parkIndex = i % parkLocations.length;
+            const parkLocation = parkLocations[parkIndex];
             
-            if (i < treeLocations.length && treeLocations[i]) {
-                // Spawn near tree
-                const treeLocation = treeLocations[i];
-                const offsetX = (Math.random() - 0.5) * 8;
-                const offsetZ = (Math.random() - 0.5) * 8;
+            // Spawn on roads near parks, not inside parks
+            const enemyPosition = this.getPositionNearPark(parkLocation);
+            
+            if (enemyPosition) {
+                const enemy = new Enemy(this.scene, this.world, enemyPosition);
+                this.enemies.push(enemy);
                 
-                enemyPosition = {
-                    x: treeLocation.x + offsetX,
-                    y: 0,
-                    z: treeLocation.z + offsetZ
-                };
-            } else if (i < parkLocations.length && parkLocations[i]) {
-                // Spawn in park
-                const parkLocation = parkLocations[i];
-                const offsetX = (Math.random() - 0.5) * 20;
-                const offsetZ = (Math.random() - 0.5) * 20;
-                
-                enemyPosition = {
-                    x: parkLocation.x + offsetX,
-                    y: 0,
-                    z: parkLocation.z + offsetZ
-                };
-            } else {
-                // Spawn randomly in city
-                enemyPosition = this.getRandomCityPosition();
+                console.log(`REPO enemy ${i + 1} spawned near park at (${enemyPosition.x.toFixed(1)}, ${enemyPosition.z.toFixed(1)})`);
             }
-            
-            const enemy = new Enemy(this.scene, this.world, enemyPosition);
-            this.enemies.push(enemy);
-            
-            console.log(`REPO enemy spawned at (${enemyPosition.x}, ${enemyPosition.z})`);
         }
         
         // Start mission with enemy count
@@ -767,8 +883,73 @@ class NPCManager {
     }
     
     spawnUndercoverNPCs() {
-        // Use the new city-wide NPC spawning
+        console.log("Spawning undercover NPCs for mission...");
+        
+        // This method should call the city-wide NPC spawning
         this.spawnCityNPCs();
+        
+        console.log(`Undercover NPCs spawned: ${this.npcs.length} total NPCs in the city`);
+        
+        // Log NPC distribution for debugging
+        const npcTypes = {};
+        this.npcs.forEach(npc => {
+            npcTypes[npc.type] = (npcTypes[npc.type] || 0) + 1;
+        });
+        
+        console.log("NPC Distribution:", npcTypes);
+        
+        return this.npcs.length;
+    }
+    
+    getPositionNearPark(parkLocation) {
+        // Generate positions on roads near parks (not inside parks)
+        const attempts = 10;
+        
+        for (let attempt = 0; attempt < attempts; attempt++) {
+            // Choose a direction from the park
+            const angle = (Math.PI * 2 * attempt) / attempts; // Spread around park
+            const distance = 25 + Math.random() * 35; // 25-60 units from park
+            
+            const position = {
+                x: parkLocation.x + Math.cos(angle) * distance,
+                y: 0,
+                z: parkLocation.z + Math.sin(angle) * distance
+            };
+            
+            // Ensure position is within city bounds
+            const cityHalf = this.citySize / 2;
+            if (Math.abs(position.x) < cityHalf - 20 && Math.abs(position.z) < cityHalf - 20) {
+                console.log(`Enemy position near park: distance ${distance.toFixed(1)} units, angle ${(angle * 180 / Math.PI).toFixed(0)}°`);
+                return position;
+            }
+        }
+        
+        // Fallback to random position near park center
+        console.warn("Could not find suitable position near park, using fallback");
+        return {
+            x: parkLocation.x + (Math.random() - 0.5) * 40,
+            y: 0,
+            z: parkLocation.z + (Math.random() - 0.5) * 40
+        };
+    }
+    
+    spawnEnemiesRandomly() {
+        // Fallback method if parks not available
+        const enemyCount = 8;
+        console.log(`Spawning ${enemyCount} enemies randomly (fallback)`);
+        
+        for (let i = 0; i < enemyCount; i++) {
+            const position = this.getRandomCityPosition();
+            const enemy = new Enemy(this.scene, this.world, position);
+            this.enemies.push(enemy);
+        }
+        
+        return enemyCount;
+    }
+    
+    spawnEnemiesInParks() {
+        // Updated method name for compatibility
+        return this.spawnEnemiesNearParks();
     }
     
     alertNearbyNPCs(position, type) {
@@ -834,3 +1015,23 @@ class NPCManager {
 window.NPC = NPC;
 window.Enemy = Enemy;
 window.NPCManager = NPCManager;
+
+// Add global interaction handler for E key
+if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', (event) => {
+        if (event.code === 'KeyE' && !event.repeat) {
+            // Check if we have an interactable NPC nearby
+            if (window.currentInteractableNPC && window.currentInteractableNPC.startDialogue) {
+                console.log("E key pressed - attempting interaction");
+                event.preventDefault();
+                
+                // Only interact if not already in dialogue
+                if (window.game && window.game.dialogueSystem && !window.game.dialogueSystem.isActive) {
+                    window.currentInteractableNPC.startDialogue();
+                }
+            }
+        }
+    });
+    
+    console.log("NPC interaction system initialized - press E near NPCs to talk");
+}
