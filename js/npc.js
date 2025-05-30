@@ -337,11 +337,37 @@ class NPC {
         });
     }
     
-    takeDamage(damage) {
+    takeDamage(damage, bodyPart = 'body') {
         if (this.isDead) return false;
         
-        this.health -= damage;
-        console.log(`${this.name} takes ${damage} damage. Health: ${this.health}/${this.maxHealth}`);
+        // Apply body part specific damage multipliers
+        let finalDamage = damage;
+        let hitDescription = '';
+        
+        switch(bodyPart) {
+            case 'head':
+                finalDamage = 40; // Always 40 for headshots
+                hitDescription = 'HEADSHOT';
+                break;
+            case 'chest':
+                finalDamage = 40; // Always 40 for chest shots
+                hitDescription = 'CHEST HIT';
+                break;
+            case 'arm':
+                finalDamage = 25; // Always 25 for arm shots
+                hitDescription = 'ARM HIT';
+                break;
+            case 'leg':
+                finalDamage = 25; // Always 25 for leg shots
+                hitDescription = 'LEG HIT';
+                break;
+            default:
+                finalDamage = damage; // Use original damage for unknown parts
+                hitDescription = 'BODY HIT';
+        }
+        
+        this.health -= finalDamage;
+        console.log(`${this.name} takes ${finalDamage} ${hitDescription} damage. Health: ${this.health}/${this.maxHealth}`);
         
         // Update health bar immediately
         this.updateHealthBar();
@@ -372,7 +398,7 @@ class NPC {
             this.becomeHostile();
         }
         
-        return false; // Still alive
+        return false; // Not killed
     }
     
     createHealthBar() {

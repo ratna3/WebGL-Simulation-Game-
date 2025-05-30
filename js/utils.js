@@ -220,6 +220,7 @@ const Utils = {
             });
             leftLegBody.addShape(leftLegShape);
             leftLegBody.position.set(position.x - 0.25 * scale, position.y + 0.5 * scale, position.z);
+            leftLegBody.userData = { bodyPart: 'leg', damage: 25 }; // Store body part info
             world.addBody(leftLegBody);
             legBodies.push(leftLegBody);
             
@@ -235,12 +236,107 @@ const Utils = {
             });
             rightLegBody.addShape(rightLegShape);
             rightLegBody.position.set(position.x + 0.25 * scale, position.y + 0.5 * scale, position.z);
+            rightLegBody.userData = { bodyPart: 'leg', damage: 25 }; // Store body part info
             world.addBody(rightLegBody);
             legBodies.push(rightLegBody);
             
             return legBodies;
         } catch (error) {
             console.error("Error creating leg collision bodies:", error);
+            return [];
+        }
+    },
+
+    createHeadCollisionBody: function(world, position, scale = 1) {
+        try {
+            // Head collision body
+            const headShape = new CANNON.Sphere(0.25 * scale);
+            const headBody = new CANNON.Body({
+                mass: 0,
+                material: new CANNON.Material({
+                    friction: 1.0,
+                    restitution: 0.0
+                }),
+                type: CANNON.Body.KINEMATIC
+            });
+            headBody.addShape(headShape);
+            headBody.position.set(position.x, position.y + 2.5 * scale, position.z);
+            headBody.userData = { bodyPart: 'head', damage: 40 }; // High damage for headshots
+            world.addBody(headBody);
+            
+            console.log(`Head collision body created at height ${position.y + 2.5 * scale}`);
+            return headBody;
+        } catch (error) {
+            console.error("Error creating head collision body:", error);
+            return null;
+        }
+    },
+
+    createChestCollisionBody: function(world, position, scale = 1) {
+        try {
+            // Chest collision body (torso)
+            const chestShape = new CANNON.Cylinder(0.35 * scale, 0.4 * scale, 1.4 * scale, 12);
+            const chestBody = new CANNON.Body({
+                mass: 0,
+                material: new CANNON.Material({
+                    friction: 1.0,
+                    restitution: 0.0
+                }),
+                type: CANNON.Body.KINEMATIC
+            });
+            chestBody.addShape(chestShape);
+            chestBody.position.set(position.x, position.y + 1.6 * scale, position.z);
+            chestBody.userData = { bodyPart: 'chest', damage: 40 }; // High damage for chest shots
+            world.addBody(chestBody);
+            
+            console.log(`Chest collision body created at height ${position.y + 1.6 * scale}`);
+            return chestBody;
+        } catch (error) {
+            console.error("Error creating chest collision body:", error);
+            return null;
+        }
+    },
+
+    createArmCollisionBodies: function(world, position, scale = 1) {
+        try {
+            const armBodies = [];
+            
+            // Left arm
+            const leftArmShape = new CANNON.Cylinder(0.09 * scale, 0.12 * scale, 1.0 * scale, 8);
+            const leftArmBody = new CANNON.Body({
+                mass: 0,
+                material: new CANNON.Material({
+                    friction: 1.0,
+                    restitution: 0.0
+                }),
+                type: CANNON.Body.KINEMATIC
+            });
+            leftArmBody.addShape(leftArmShape);
+            leftArmBody.position.set(position.x - 0.55 * scale, position.y + 1.8 * scale, position.z);
+            leftArmBody.userData = { bodyPart: 'arm', damage: 25 }; // Moderate damage for arms
+            world.addBody(leftArmBody);
+            armBodies.push(leftArmBody);
+            
+            // Right arm
+            const rightArmShape = new CANNON.Cylinder(0.09 * scale, 0.12 * scale, 1.0 * scale, 8);
+            const rightArmBody = new CANNON.Body({
+                mass: 0,
+                material: new CANNON.Material({
+                    friction: 1.0,
+                    restitution: 0.0
+                }),
+                type: CANNON.Body.KINEMATIC
+            });
+            rightArmBody.addShape(rightArmShape);
+            rightArmBody.position.set(position.x + 0.55 * scale, position.y + 1.8 * scale, position.z);
+            rightArmBody.userData = { bodyPart: 'arm', damage: 25 }; // Moderate damage for arms
+            world.addBody(rightArmBody);
+            armBodies.push(rightArmBody);
+            
+            console.log(`Arm collision bodies created`);
+            return armBodies;
+        } catch (error) {
+            console.error("Error creating arm collision bodies:", error);
             return [];
         }
     },
@@ -261,6 +357,7 @@ const Utils = {
             });
             leftFootBody.addShape(leftFootShape);
             leftFootBody.position.set(position.x - 0.25 * scale, position.y - 0.7 * scale, position.z);
+            leftFootBody.userData = { bodyPart: 'leg', damage: 25 }; // Legs damage for feet
             world.addBody(leftFootBody);
             footBodies.push(leftFootBody);
             
@@ -276,94 +373,57 @@ const Utils = {
             });
             rightFootBody.addShape(rightFootShape);
             rightFootBody.position.set(position.x + 0.25 * scale, position.y - 0.7 * scale, position.z);
+            rightFootBody.userData = { bodyPart: 'leg', damage: 25 }; // Legs damage for feet
             world.addBody(rightFootBody);
             footBodies.push(rightFootBody);
-
+            
             return footBodies;
         } catch (error) {
-            console.error("Error creating foot bodies:", error);
+            console.error("Error creating foot collision bodies:", error);
             return [];
         }
     },
 
-    cleanupCharacterPhysics: function(world, physicsData) {
+    createCompleteCharacterCollision: function(world, position, scale = 1) {
         try {
-            if (!physicsData || !world) return;
-
-            if (physicsData.mainBody) {
-                world.removeBody(physicsData.mainBody);
-            }
-
-            if (physicsData.legBodies) {
-                physicsData.legBodies.forEach(body => {
-                    world.removeBody(body);
-                });
-            }
+            console.log(`Creating complete character collision at position:`, position);
+            
+            const collisionBodies = {
+                head: null,
+                chest: null,
+                arms: [],
+                legs: [],
+                feet: []
+            };
+            
+            // Create all body part collision bodies
+            collisionBodies.head = this.createHeadCollisionBody(world, position, scale);
+            collisionBodies.chest = this.createChestCollisionBody(world, position, scale);
+            collisionBodies.arms = this.createArmCollisionBodies(world, position, scale);
+            collisionBodies.legs = this.createLegCollisionBodies(world, position, scale);
+            collisionBodies.feet = this.createFootBodies(world, position, scale);
+            
+            // Flatten all bodies into a single array for easier management
+            const allBodies = [];
+            if (collisionBodies.head) allBodies.push(collisionBodies.head);
+            if (collisionBodies.chest) allBodies.push(collisionBodies.chest);
+            allBodies.push(...collisionBodies.arms);
+            allBodies.push(...collisionBodies.legs);
+            allBodies.push(...collisionBodies.feet);
+            
+            console.log(`Created ${allBodies.length} collision bodies for character`);
+            
+            return {
+                bodies: collisionBodies,
+                allBodies: allBodies
+            };
         } catch (error) {
-            console.error("Error cleaning up character physics:", error);
+            console.error("Error creating complete character collision:", error);
+            return { bodies: {}, allBodies: [] };
         }
     },
 
-    getRandomPosition: function(bounds) {
-        return {
-            x: (Math.random() - 0.5) * bounds.width,
-            y: 0,
-            z: (Math.random() - 0.5) * bounds.depth
-        };
-    },
-
-    calculateDistance: function(pos1, pos2) {
-        return Math.sqrt(
-            Math.pow(pos1.x - pos2.x, 2) +
-            Math.pow(pos1.y - pos2.y, 2) +
-            Math.pow(pos1.z - pos2.z, 2)
-        );
-    },
-
-    clamp: function(value, min, max) {
-        return Math.min(Math.max(value, min), max);
-    },
-
-    lerp: function(a, b, t) {
-        return a + (b - a) * t;
-    },
-
-    randomChoice: function(array) {
-        return array[Math.floor(Math.random() * array.length)];
-    },
-
-    createMaterial: function(color, options = {}) {
-        return new THREE.MeshStandardMaterial({
-            color: color,
-            metalness: options.metalness || 0.1,
-            roughness: options.roughness || 0.8,
-            transparent: options.transparent || false,
-            opacity: options.opacity || 1.0
-        });
-    },
-    
-    // Add specialized material creation for effects
-    createEmissiveMaterial: function(color, emissiveColor, options = {}) {
-        return new THREE.MeshStandardMaterial({
-            color: color,
-            emissive: emissiveColor || color,
-            emissiveIntensity: options.emissiveIntensity || 1.0,
-            metalness: options.metalness || 0.0,
-            roughness: options.roughness || 0.0,
-            transparent: options.transparent || false,
-            opacity: options.opacity || 1.0
-        });
-    },
-    
-    // Create basic material without emissive properties
-    createBasicMaterial: function(color, options = {}) {
-        return new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: options.transparent || false,
-            opacity: options.opacity || 1.0,
-            side: options.side || THREE.FrontSide
-        });
-    }
+    // ...existing code...
 };
 
 window.Utils = Utils;

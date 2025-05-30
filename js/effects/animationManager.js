@@ -72,19 +72,30 @@ class EnemyAnimationManager {
         this.playDeathSound();
     }
     
-    playHitAnimation(enemy) {
+    playHitAnimation(enemy, bodyPart = 'body') {
         const animData = this.animations.get(enemy);
         if (!animData || animData.isDying) return;
         
-        console.log("Playing hit animation for enemy");
+        console.log(`Playing hit animation for enemy - ${bodyPart} hit`);
         animData.isHit = true;
         animData.hitStartTime = Date.now();
+        animData.hitBodyPart = bodyPart; // Store which body part was hit
         
-        // Create blood splatter
-        this.createBloodSplatter(enemy, 0.5); // Smaller splatter for hit
+        // Create body part specific blood splatter
+        const splatterScale = bodyPart === 'head' ? 1.5 : (bodyPart === 'chest' ? 1.0 : 0.5);
+        this.createBloodSplatter(enemy, splatterScale);
         
-        // Create hit sound
-        this.playHitSound();
+        // Create appropriate hit sound based on body part
+        if (bodyPart === 'head') {
+            this.playHeadshotSound();
+        } else {
+            this.playHitSound();
+        }
+    }
+    
+    playHeadshotSound() {
+        // Special sound for headshots
+        this.playSound([1200, 600, 200], [0.03, 0.08, 0.15], 0.3);
     }
     
     playShootAnimation(enemy) {

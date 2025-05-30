@@ -152,10 +152,12 @@ class BulletSystem {
                 hitPosition: hitPosition
             });
             
-            // Check what was hit with improved detection
+            // Check what was hit with improved body part detection
             let hitTarget = null;
+            let bodyPart = 'body';
+            let damageAmount = 25; // Default damage
             
-            // ENHANCED enemy detection - check all body parts
+            // ENHANCED enemy detection with body part identification
             if (window.game && window.game.npcManager) {
                 console.log("Checking enemy collisions...");
                 console.log("Available enemies:", window.game.npcManager.enemies.length);
@@ -163,15 +165,35 @@ class BulletSystem {
                 for (let i = 0; i < window.game.npcManager.enemies.length; i++) {
                     const enemy = window.game.npcManager.enemies[i];
                     
-                    if (!enemy.isDead && enemy.body) {
-                        // Check direct body hit
+                    if (!enemy.isDead) {
+                        // Check if the collision body belongs to this enemy
+                        if (enemy.collisionBodies && enemy.collisionBodies.allBodies) {
+                            const bodyIndex = enemy.collisionBodies.allBodies.indexOf(otherBody);
+                            
+                            if (bodyIndex !== -1) {
+                                // Found the body part that was hit
+                                if (otherBody.userData && otherBody.userData.bodyPart) {
+                                    bodyPart = otherBody.userData.bodyPart;
+                                    damageAmount = otherBody.userData.damage || 25;
+                                }
+                                
+                                hitTarget = { type: 'enemy', target: enemy };
+                                console.log(`HIT ENEMY ${bodyPart.toUpperCase()}:`, enemy.name || 'Unknown');
+                                console.log(`Body part damage: ${damageAmount}`);
+                                break;
+                            }
+                        }
+                        
+                        // Fallback: Check main body collision
                         if (enemy.body === otherBody) {
+                            bodyPart = 'chest'; // Default to chest for main body
+                            damageAmount = 40;
                             hitTarget = { type: 'enemy', target: enemy };
-                            console.log("HIT ENEMY BODY:", enemy.name || 'Unknown');
+                            console.log("HIT ENEMY MAIN BODY:", enemy.name || 'Unknown');
                             break;
                         }
                         
-                        // Check if bullet hit any part of enemy (improved detection)
+                        // Enhanced proximity check with body part estimation
                         if (enemy.group) {
                             const enemyPosition = enemy.body.position;
                             const bulletPosition = bullet.mesh.position;
@@ -181,43 +203,63 @@ class BulletSystem {
                                 Math.pow(enemyPosition.z - bulletPosition.z, 2)
                             );
                             
-                            // If bullet is very close to enemy, consider it a hit
-                            if (distance < 1.5) { // Within 1.5 units of enemy center
+                            // If bullet is very close to enemy, estimate body part based on height
+                            if (distance < 1.5) {
+                                const hitHeight = bulletPosition.y - enemyPosition.y;
+                                
+                                // Estimate body part based on hit height
+                                if (hitHeight > 1.8) {
+                                    bodyPart = 'head';
+                                    damageAmount = 40;
+                                } else if (hitHeight > 0.8) {
+                                    bodyPart = 'chest';
+                                    damageAmount = 40;
+                                } else if (hitHeight > -0.2) {
+                                    bodyPart = 'arm';
+                                    damageAmount = 25;
+                                } else {
+                                    bodyPart = 'leg';
+                                    damageAmount = 25;
+                                }
+                                
                                 hitTarget = { type: 'enemy', target: enemy };
-                                console.log("HIT ENEMY (proximity):", enemy.name || 'Unknown');
+                                console.log(`HIT ENEMY (proximity estimation) ${bodyPart.toUpperCase()}:`, enemy.name || 'Unknown');
+                                console.log(`Estimated hit height: ${hitHeight}, damage: ${damageAmount}`);
                                 break;
                             }
                         }
                     }
                 }
                 
-                // Check NPCs if no enemy hit
+                // Check NPCs with same body part detection
                 if (!hitTarget) {
                     for (let i = 0; i < window.game.npcManager.npcs.length; i++) {
                         const npc = window.game.npcManager.npcs[i];
                         
-                        if (!npc.isDead && npc.body) {
-                            if (npc.body === otherBody) {
-                                hitTarget = { type: 'npc', target: npc };
-                                console.log("HIT NPC:", npc.name || 'Unknown');
-                                break;
-                            }
-                            
-                            // Proximity check for NPCs too
-                            if (npc.group) {
-                                const npcPosition = npc.body.position;
-                                const bulletPosition = bullet.mesh.position;
-                                const distance = Math.sqrt(
-                                    Math.pow(npcPosition.x - bulletPosition.x, 2) + 
-                                    Math.pow(npcPosition.y - bulletPosition.y, 2) + 
-                                    Math.pow(npcPosition.z - bulletPosition.z, 2)
-                                );
+                        if (!npc.isDead) {
+                            // Check collision bodies for NPCs too
+                            if (npc.collisionBodies && npc.collisionBodies.allBodies) {
+                                const bodyIndex = npc.collisionBodies.allBodies.indexOf(otherBody);
                                 
-                                if (distance < 1.5) {
+                                if (bodyIndex !== -1) {
+                                    if (otherBody.userData && otherBody.userData.bodyPart) {
+                                        bodyPart = otherBody.userData.bodyPart;
+                                        damageAmount = otherBody.userData.damage || 25;
+                                    }
+                                    
                                     hitTarget = { type: 'npc', target: npc };
-                                    console.log("HIT NPC (proximity):", npc.name || 'Unknown');
+                                    console.log(`HIT NPC ${bodyPart.toUpperCase()}:`, npc.name || 'Unknown');
                                     break;
                                 }
+                            }
+                            
+                            // Fallback checks for NPCs
+                            if (npc.body === otherBody) {
+                                bodyPart = 'chest';
+                                damageAmount = 40;
+                                hitTarget = { type: 'npc', target: npc };
+                                console.log("HIT NPC MAIN BODY:", npc.name || 'Unknown');
+                                break;
                             }
                         }
                     }
@@ -238,8 +280,8 @@ class BulletSystem {
             
             // Handle damage if target found
             if (hitTarget) {
-                console.log("Dealing damage to target:", hitTarget.type);
-                this.dealDamage(hitTarget, bullet, hitPosition);
+                console.log(`Dealing ${damageAmount} damage to ${bodyPart} of ${hitTarget.type}`);
+                this.dealDamage(hitTarget, bullet, hitPosition, bodyPart, damageAmount);
             }
             
             // Create impact effect regardless
@@ -256,13 +298,12 @@ class BulletSystem {
         }
     }
 
-    dealDamage(hitTarget, bullet, hitPosition) {
+    dealDamage(hitTarget, bullet, hitPosition, bodyPart = 'body', damageAmount = 25) {
         try {
-            const damage = Number(bullet.damage);
-            
             console.log("=== DEALING DAMAGE ===");
             console.log("Target type:", hitTarget.type);
-            console.log("Damage amount:", damage);
+            console.log("Body part hit:", bodyPart);
+            console.log("Damage amount:", damageAmount);
             console.log("Bullet shooter:", bullet.shooter);
             
             switch (hitTarget.type) {
@@ -272,7 +313,7 @@ class BulletSystem {
                     console.log("Enemy health before:", hitTarget.target.health);
                     
                     if (typeof hitTarget.target.takeDamage === 'function') {
-                        const wasKilled = hitTarget.target.takeDamage(damage);
+                        const wasKilled = hitTarget.target.takeDamage(damageAmount, bodyPart);
                         console.log("Enemy health after:", hitTarget.target.health);
                         console.log("Enemy was killed:", wasKilled);
                         
@@ -283,8 +324,20 @@ class BulletSystem {
                             console.log("Enemy becomes aggressive!");
                         }
                         
-                        // Show hit feedback
-                        this.showDamageNumber(hitPosition, damage, '#ff0000');
+                        // Show hit feedback with body part info
+                        const colorByBodyPart = {
+                            'head': '#ff0000',      // Red for headshots
+                            'chest': '#ff3300',     // Dark red for chest
+                            'arm': '#ff6600',       // Orange for arms
+                            'leg': '#ff9900'        // Yellow for legs
+                        };
+                        
+                        this.showDamageNumber(hitPosition, damageAmount, colorByBodyPart[bodyPart] || '#ff0000');
+                        
+                        // Show special effect for headshots
+                        if (bodyPart === 'head') {
+                            this.createHeadshotEffect(hitPosition);
+                        }
                         
                         // Update health bar
                         if (hitTarget.target.updateHealthBar) {
@@ -305,7 +358,7 @@ class BulletSystem {
                     console.log("NPC name:", hitTarget.target.name || 'Unknown');
                     
                     if (typeof hitTarget.target.takeDamage === 'function') {
-                        hitTarget.target.takeDamage(damage);
+                        hitTarget.target.takeDamage(damageAmount, bodyPart);
                         
                         // NPCs become hostile when shot
                         if (!hitTarget.target.isHostile) {
@@ -313,7 +366,7 @@ class BulletSystem {
                             console.log("NPC becomes hostile!");
                         }
                         
-                        this.showDamageNumber(hitPosition, damage, '#ffaa00');
+                        this.showDamageNumber(hitPosition, damageAmount, '#ffaa00');
                     } else {
                         console.error("NPC missing takeDamage method!");
                     }
@@ -323,8 +376,8 @@ class BulletSystem {
                     if (bullet.shooter !== 'player') {
                         console.log("PLAYER HIT by enemy bullet!");
                         if (window.game && typeof window.game.playerTakeDamage === 'function') {
-                            window.game.playerTakeDamage(damage);
-                            this.showDamageNumber(hitPosition, damage, '#ff6600');
+                            window.game.playerTakeDamage(damageAmount);
+                            this.showDamageNumber(hitPosition, damageAmount, '#ff6600');
                         }
                     }
                     break;

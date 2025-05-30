@@ -303,17 +303,17 @@ class Weapon {
             console.log("Bullet direction:", direction);
             console.log("Weapon damage:", this.damage);
             
-            // Create bullet with exact damage
+            // Create bullet with exact damage - the bullet system will handle body part detection
             const bullet = this.bulletSystem.createBullet(
                 startPosition, 
                 direction, 
                 100, // High speed
-                this.damage, // Exact damage (40)
+                40, // Base damage (will be modified by body part in bullet system)
                 'player'
             );
             
             if (bullet) {
-                console.log("Bullet created successfully:", bullet.damage, "damage");
+                console.log("Bullet created successfully with enhanced body part detection");
                 console.log("Bullet physics body:", !!bullet.body);
                 console.log("Bullet mesh:", !!bullet.mesh);
                 
@@ -325,7 +325,7 @@ class Weapon {
                     bullet.body.collisionFilterGroup = 1;
                     bullet.body.collisionFilterMask = -1;
                     
-                    console.log("Bullet collision detection enabled");
+                    console.log("Bullet collision detection enabled for all body parts");
                 } else {
                     console.error("Bullet has no physics body!");
                 }

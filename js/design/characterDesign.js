@@ -1,9 +1,17 @@
 class CharacterDesign {
     constructor() {
-        // Standardize character scales for consistency
+        // Standardize character scales for consistency - FIXED HEIGHT CALCULATIONS
         this.npcScale = 1.0; // Base scale - will be applied to entire group
         this.enemyScale = 1.1; // Slightly larger enemies
         this.characterHeight = 3.2; // Standard character height in world units
+        
+        // CRITICAL: Proper body part positioning ratios
+        this.bodyProportions = {
+            headHeight: 2.8,      // Head at 2.8 units from ground
+            chestHeight: 1.6,     // Chest center at 1.6 units
+            armHeight: 1.8,       // Arms at 1.8 units
+            legHeight: 0.8        // Legs at 0.8 units
+        };
         
         this.nameDatabase = {
             civilian: [
@@ -104,32 +112,32 @@ class CharacterDesign {
             
             const colors = colorSchemes[type] || colorSchemes.civilian;
             
-            // Create detailed head with facial features - Fixed positioning
+            // Create detailed head with facial features - FIXED positioning using proportions
             const headGroup = this.createDetailedHead(colors, scale);
-            headGroup.position.y = 2.5 * scale; // Adjusted for proper head placement
+            headGroup.position.y = this.bodyProportions.headHeight * scale; // CORRECTED: Use proper head height
             group.add(headGroup);
             
             // Create detailed torso
             const torsoGroup = this.createDetailedTorso(colors, scale);
-            torsoGroup.position.y = 1.6 * scale; // Centered torso position
+            torsoGroup.position.y = this.bodyProportions.chestHeight * scale; // Use proportional chest height
             group.add(torsoGroup);
             
-            // Create detailed arms with hands
+            // Create detailed arms with hands - FIXED positioning
             const leftArmGroup = this.createDetailedArm(colors, scale, true);
-            leftArmGroup.position.set(-0.55 * scale, 1.8 * scale, 0); // Adjusted arm height
+            leftArmGroup.position.set(-0.55 * scale, this.bodyProportions.armHeight * scale, 0); // CORRECTED: Use arm height
             group.add(leftArmGroup);
             
             const rightArmGroup = this.createDetailedArm(colors, scale, false);
-            rightArmGroup.position.set(0.55 * scale, 1.8 * scale, 0); // Adjusted arm height
+            rightArmGroup.position.set(0.55 * scale, this.bodyProportions.armHeight * scale, 0); // CORRECTED: Use arm height
             group.add(rightArmGroup);
             
-            // Create detailed legs with feet
+            // Create detailed legs with feet - FIXED positioning
             const leftLegGroup = this.createDetailedLeg(colors, scale, true);
-            leftLegGroup.position.set(-0.25 * scale, 0.8 * scale, 0); // Adjusted leg height
+            leftLegGroup.position.set(-0.25 * scale, this.bodyProportions.legHeight * scale, 0); // CORRECTED: Use leg height
             group.add(leftLegGroup);
             
             const rightLegGroup = this.createDetailedLeg(colors, scale, false);
-            rightLegGroup.position.set(0.25 * scale, 0.8 * scale, 0); // Adjusted leg height
+            rightLegGroup.position.set(0.25 * scale, this.bodyProportions.legHeight * scale, 0); // CORRECTED: Use leg height
             group.add(rightLegGroup);
             
             // Add character-specific accessories
@@ -141,6 +149,7 @@ class CharacterDesign {
                 scale: scale,
                 totalHeight: this.characterHeight * scale,
                 colors: colors,
+                bodyProportions: this.bodyProportions, // Store proportions for collision detection
                 components: {
                     head: headGroup,
                     torso: torsoGroup,
@@ -152,6 +161,7 @@ class CharacterDesign {
             };
             
             console.log(`Detailed ${type} character created with height ${this.characterHeight * scale} units`);
+            console.log(`Head positioned at: ${this.bodyProportions.headHeight * scale} units (should be visible above chest)`);
             
         } catch (error) {
             console.error("Error creating detailed humanoid character:", error);
@@ -161,7 +171,7 @@ class CharacterDesign {
     }
     
     createSimpleFallbackCharacter(group, type, scale) {
-        console.log(`Creating simple fallback character for ${type}`);
+        console.log(`Creating simple fallback character for ${type} with CORRECTED head positioning`);
         
         // Clear any existing children
         while(group.children.length > 0) {
@@ -179,47 +189,48 @@ class CharacterDesign {
         const bodyGeometry = new THREE.CylinderGeometry(0.35 * scale, 0.4 * scale, 1.4 * scale, 12);
         const bodyMaterial = new THREE.MeshStandardMaterial({ color: colors.clothing });
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        body.position.y = 1.6 * scale;
+        body.position.y = this.bodyProportions.chestHeight * scale; // CORRECTED: Use proper chest height
         body.castShadow = true;
         group.add(body);
         
-        // Simple head - ENSURE THIS IS ALWAYS CREATED
+        // Simple head - ENSURE THIS IS ALWAYS CREATED AT CORRECT HEIGHT
         const headGeometry = new THREE.SphereGeometry(0.25 * scale, 12, 12);
         const headMaterial = new THREE.MeshStandardMaterial({ color: colors.skin });
         const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.y = 2.5 * scale; // Proper head position
+        head.position.y = this.bodyProportions.headHeight * scale; // CORRECTED: Proper head position above chest
         head.castShadow = true;
+        head.receiveShadow = true;
         group.add(head);
         
-        // Simple arms
+        // Simple arms - CORRECTED positioning
         const armGeometry = new THREE.CylinderGeometry(0.08 * scale, 0.1 * scale, 1.0 * scale, 8);
         const armMaterial = new THREE.MeshStandardMaterial({ color: colors.skin });
         
         const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-        leftArm.position.set(-0.5 * scale, 1.8 * scale, 0);
+        leftArm.position.set(-0.5 * scale, this.bodyProportions.armHeight * scale, 0); // CORRECTED
         leftArm.castShadow = true;
         group.add(leftArm);
         
         const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-        rightArm.position.set(0.5 * scale, 1.8 * scale, 0);
+        rightArm.position.set(0.5 * scale, this.bodyProportions.armHeight * scale, 0); // CORRECTED
         rightArm.castShadow = true;
         group.add(rightArm);
         
-        // Simple legs
+        // Simple legs - CORRECTED positioning
         const legGeometry = new THREE.CylinderGeometry(0.12 * scale, 0.15 * scale, 1.4 * scale, 8);
         const legMaterial = new THREE.MeshStandardMaterial({ color: colors.pants });
         
         const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-        leftLeg.position.set(-0.2 * scale, 0.7 * scale, 0);
+        leftLeg.position.set(-0.2 * scale, this.bodyProportions.legHeight * scale, 0); // CORRECTED
         leftLeg.castShadow = true;
         group.add(leftLeg);
         
         const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-        rightLeg.position.set(0.2 * scale, 0.7 * scale, 0);
+        rightLeg.position.set(0.2 * scale, this.bodyProportions.legHeight * scale, 0); // CORRECTED
         rightLeg.castShadow = true;
         group.add(rightLeg);
         
-        console.log(`Simple fallback character created for ${type} with guaranteed head`);
+        console.log(`Simple fallback character created for ${type} with guaranteed head at height ${this.bodyProportions.headHeight * scale}`);
     }
     
     createDetailedHead(colors, scale) {
@@ -685,7 +696,7 @@ class CharacterDesign {
         const barrelGeometry = new THREE.CylinderGeometry(0.02 * scale, 0.02 * scale, 0.4 * scale, 8);
         const barrel = new THREE.Mesh(barrelGeometry, bodyMaterial);
         barrel.rotation.z = Math.PI / 2;
-        barrel.position.set(0, 0, 0.5 * scale);
+        barrel.position.set(0.4 * scale, 0, 0); // Position at front for proper bullet spawn
         weaponGroup.add(barrel);
         
         // Stock
@@ -694,6 +705,10 @@ class CharacterDesign {
         stock.position.set(0, 0, -0.4 * scale);
         weaponGroup.add(stock);
         
+        // Store barrel reference for muzzle flash positioning
+        weaponGroup.userData.barrel = barrel;
+        
+        console.log("Enemy weapon created with proper barrel positioning");
         return weaponGroup;
     }
     

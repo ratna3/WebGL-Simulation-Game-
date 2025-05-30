@@ -370,12 +370,15 @@ class Game {
         let npcCount = 0;
         let facesLoaded = 0;
         let missingHeads = [];
+        let incorrectlyPositionedHeads = [];
         
         // Check NPCs
         this.npcManager.npcs.forEach((npc, index) => {
             npcCount++;
             if (npc.group) {
                 let hasHead = false;
+                let headPosition = null;
+                let chestPosition = null;
                 let hasFacialFeatures = false;
                 
                 npc.group.traverse(child => {
@@ -383,6 +386,11 @@ class Game {
                         // Check for head (sphere geometry at proper height)
                         if (child.geometry instanceof THREE.SphereGeometry && child.position.y > 2.0) {
                             hasHead = true;
+                            headPosition = child.position.y;
+                        }
+                        // Check for chest/torso position
+                        if (child.geometry instanceof THREE.CylinderGeometry && child.position.y > 1.0 && child.position.y < 2.0) {
+                            chestPosition = child.position.y;
                         }
                         // Check for facial features (small meshes at head level)
                         if (child.position.y > 2.0 && child.geometry instanceof THREE.SphereGeometry && 
@@ -392,8 +400,15 @@ class Game {
                     }
                 });
                 
-                if (hasHead) facesLoaded++;
-                if (!hasHead) {
+                if (hasHead) {
+                    facesLoaded++;
+                    // Verify head is properly positioned above chest
+                    if (chestPosition && headPosition && (headPosition - chestPosition) < 0.5) {
+                        incorrectlyPositionedHeads.push(`NPC ${index}: ${npc.name || 'Unnamed'} - Head too close to chest (${headPosition} vs ${chestPosition})`);
+                        console.warn(`Head positioning issue for ${npc.name}: head at ${headPosition}, chest at ${chestPosition}`);
+                        this.fixHeadPositioning(npc, headPosition, chestPosition);
+                    }
+                } else {
                     missingHeads.push(`NPC ${index}: ${npc.name || 'Unnamed'} (${npc.type})`);
                     console.warn(`Missing head detected for NPC ${npc.name}:`, npc.group);
                     
@@ -403,21 +418,33 @@ class Game {
             }
         });
         
-        // Check enemies
+        // Check enemies with same verification
         this.npcManager.enemies.forEach((enemy, index) => {
             npcCount++;
             if (enemy.group) {
                 let hasHead = false;
+                let headPosition = null;
+                let chestPosition = null;
                 
                 enemy.group.traverse(child => {
-                    if (child instanceof THREE.Mesh && child.geometry instanceof THREE.SphereGeometry && 
-                        child.position.y > 2.0) {
-                        hasHead = true;
+                    if (child instanceof THREE.Mesh) {
+                        if (child.geometry instanceof THREE.SphereGeometry && child.position.y > 2.0) {
+                            hasHead = true;
+                            headPosition = child.position.y;
+                        }
+                        if (child.geometry instanceof THREE.CylinderGeometry && child.position.y > 1.0 && child.position.y < 2.0) {
+                            chestPosition = child.position.y;
+                        }
                     }
                 });
                 
-                if (hasHead) facesLoaded++;
-                if (!hasHead) {
+                if (hasHead) {
+                    facesLoaded++;
+                    if (chestPosition && headPosition && (headPosition - chestPosition) < 0.5) {
+                        incorrectlyPositionedHeads.push(`Enemy ${index}: ${enemy.name || 'Unnamed'} - Head too close to chest`);
+                        this.fixHeadPositioning(enemy, headPosition, chestPosition);
+                    }
+                } else {
                     missingHeads.push(`Enemy ${index}: ${enemy.name || 'Unnamed'}`);
                     console.warn(`Missing head detected for enemy ${enemy.name}:`, enemy.group);
                     
@@ -433,10 +460,55 @@ class Game {
             console.warn(`Characters missing heads:`, missingHeads);
         }
         
+        if (incorrectlyPositionedHeads.length > 0) {
+            console.warn(`Characters with head positioning issues:`, incorrectlyPositionedHeads);
+        }
+        
         if (facesLoaded === 0 && npcCount > 0) {
             console.error("CRITICAL: No character heads detected - character system failure");
         } else {
             console.log(`Character system verification complete: ${Math.round(facesLoaded/npcCount*100)}% success rate`);
+            if (incorrectlyPositionedHeads.length > 0) {
+                console.log(`Fixed ${incorrectlyPositionedHeads.length} head positioning issues`);
+            }
+        }
+    }
+    
+    fixHeadPositioning(character, currentHeadHeight, chestHeight) {
+        if (!character || !character.group) return;
+        
+        console.log(`Fixing head positioning for ${character.name} - moving head from ${currentHeadHeight} to proper position`);
+        
+        try {
+            // Find and reposition the head
+            character.group.traverse(child => {
+                if (child instanceof THREE.Mesh && child.geometry instanceof THREE.SphereGeometry && 
+                    Math.abs(child.position.y - currentHeadHeight) < 0.1) {
+                    
+                    // Calculate proper head position (should be well above chest)
+                    const properHeadHeight = Math.max(chestHeight + 1.2, 2.8);
+                    
+                    console.log(`Moving head from ${child.position.y} to ${properHeadHeight}`);
+                    child.position.y = properHeadHeight;
+                    
+                    // Also move any facial features with the head
+                    character.group.traverse(feature => {
+                        if (feature !== child && feature instanceof THREE.Mesh && 
+                            Math.abs(feature.position.y - currentHeadHeight) < 0.3 &&
+                            feature.geometry instanceof THREE.SphereGeometry &&
+                            feature.geometry.parameters && feature.geometry.parameters.radius < 0.1) {
+                            
+                            const offset = feature.position.y - currentHeadHeight;
+                            feature.position.y = properHeadHeight + offset;
+                            console.log(`Also moved facial feature to ${feature.position.y}`);
+                        }
+                    });
+                }
+            });
+            
+            console.log(`Head positioning fixed for ${character.name}`);
+        } catch (error) {
+            console.error(`Failed to fix head positioning for ${character.name}:`, error);
         }
     }
     
@@ -446,24 +518,31 @@ class Game {
         console.log(`Attempting to fix missing head for ${character.name}`);
         
         try {
-            // Create emergency head
+            // Find chest position to position head correctly relative to it
+            let chestHeight = 1.6; // Default
+            character.group.traverse(child => {
+                if (child instanceof THREE.Mesh && child.geometry instanceof THREE.CylinderGeometry &&
+                    child.position.y > 1.0 && child.position.y < 2.0) {
+                    chestHeight = child.position.y;
+                }
+            });
+            
+            // Create emergency head at proper position above chest
             const headGeometry = new THREE.SphereGeometry(0.25, 12, 12);
             const headMaterial = new THREE.MeshStandardMaterial({ 
                 color: character.type === 'enemy' ? 0xA0A0A0 : 0xDDB592 
             });
             const emergencyHead = new THREE.Mesh(headGeometry, headMaterial);
             
-            // Position head properly based on character type
-            const scale = character.characterDesign ? 
-                (character.type === 'enemy' ? character.characterDesign.enemyScale : character.characterDesign.npcScale) : 1.0;
-            
-            emergencyHead.position.y = 2.5 * scale;
+            // Position head properly above chest
+            const properHeadHeight = chestHeight + 1.2; // Ensure head is well above chest
+            emergencyHead.position.y = properHeadHeight;
             emergencyHead.castShadow = true;
             emergencyHead.receiveShadow = true;
             
             character.group.add(emergencyHead);
             
-            console.log(`Emergency head added to ${character.name} at height ${emergencyHead.position.y}`);
+            console.log(`Emergency head added to ${character.name} at height ${emergencyHead.position.y} (chest at ${chestHeight})`);
         } catch (error) {
             console.error(`Failed to fix missing head for ${character.name}:`, error);
         }
@@ -835,11 +914,26 @@ class Game {
         }
     }
     
-    playerTakeDamage(damage) {
+    playerTakeDamage(damage, bodyPart = 'body') {
         if (this.playerHealth <= 0) return; // Already dead
         
-        this.playerHealth = Math.max(0, this.playerHealth - damage);
-        console.log(`Player takes ${damage} damage. Health: ${this.playerHealth}/${this.maxPlayerHealth}`);
+        // Apply body part specific damage for player too
+        let finalDamage = damage;
+        switch(bodyPart) {
+            case 'head':
+                finalDamage = Math.min(damage * 2, 60); // Headshots more dangerous for player
+                break;
+            case 'chest':
+                finalDamage = damage;
+                break;
+            case 'arm':
+            case 'leg':
+                finalDamage = Math.max(damage * 0.8, 15); // Reduced damage to limbs
+                break;
+        }
+        
+        this.playerHealth = Math.max(0, this.playerHealth - finalDamage);
+        console.log(`Player takes ${finalDamage} ${bodyPart} damage. Health: ${this.playerHealth}/${this.maxPlayerHealth}`);
         
         // Update health bar UI
         this.updateHealthBar();
