@@ -149,15 +149,34 @@ class NPC {
     }
     
     createPhysicsBody() {
-        const shape = new CANNON.Cylinder(0.4, 0.4, 1.6, 12);
-        this.body = new CANNON.Body({ 
-            mass: 70,
-            material: new CANNON.Material({ friction: 0.3 })
-        });
-        this.body.addShape(shape);
-        this.body.position.set(this.position.x, this.position.y + 0.8, this.position.z);
-        this.body.fixedRotation = true;
-        this.world.addBody(this.body);
+        try {
+            // Create physics body that matches character height and scale
+            const characterScale = this.characterDesign ? this.characterDesign.npcScale || 1.8 : 1.8;
+            const shape = new CANNON.Cylinder(0.4, 0.4, 1.6, 12);
+            
+            this.body = new CANNON.Body({ 
+                mass: 70,
+                material: new CANNON.Material({ 
+                    friction: 0.3,
+                    restitution: 0.1
+                }),
+                fixedRotation: true,
+                allowSleep: false
+            });
+            
+            this.body.addShape(shape);
+            // Position physics body to match visual character height
+            this.body.position.set(
+                this.position.x, 
+                this.position.y + (0.8 * characterScale), 
+                this.position.z
+            );
+            
+            this.world.addBody(this.body);
+            console.log(`Physics body created for ${this.name} with scale ${characterScale}`);
+        } catch (error) {
+            console.error(`Error creating physics body for ${this.name}:`, error);
+        }
     }
     
     update(playerPosition, delta) {
@@ -166,10 +185,12 @@ class NPC {
         // Update walking animation
         this.updateWalkingAnimation(delta);
         
-        // Update mesh position to match physics body
-        if (this.body) {
+        // Update mesh position to match physics body with proper offset
+        if (this.body && this.group) {
             this.group.position.copy(this.body.position);
-            this.group.position.y -= 0.8;
+            // Adjust for character scale and center offset
+            const characterScale = this.characterDesign ? this.characterDesign.npcScale || 1.8 : 1.8;
+            this.group.position.y -= (0.8 * characterScale);
         }
         
         // Check for player interaction with improved distance checking
@@ -693,43 +714,102 @@ class Enemy {
     }
     
     createRepoCharacter() {
-        // Use the character design system
-        const result = this.characterDesign.createEnemyCharacter();
-        this.group = result.group;
-        this.weaponGroup = result.weaponGroup;
+        try {
+            // Use the character design system with proper scaling
+            const result = this.characterDesign.createEnemyCharacter();
+            this.group = result.group;
+            this.weaponGroup = result.weaponGroup;
+            
+            this.group.position.set(this.position.x, this.position.y, this.position.z);
+            this.mesh = this.group;
+            
+            console.log(`REPO character created for ${this.name} with scale ${this.characterDesign.enemyScale}`);
+        } catch (error) {
+            console.error(`Error creating REPO character for ${this.name}:`, error);
+            this.createFallbackEnemyCharacter();
+        }
+    }
+    
+    createFallbackEnemyCharacter() {
+        // Fallback enemy character if detailed creation fails
+        console.log(`Creating fallback enemy character for ${this.name}`);
+        
+        this.group = new THREE.Group();
+        const scale = 2.0; // Match enemy scale
+        
+        // Body
+        const bodyGeometry = new THREE.CylinderGeometry(0.35 * scale, 0.4 * scale, 1.4 * scale, 12);
+        const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x4A5568 });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 0.7 * scale;
+        body.castShadow = true;
+        this.group.add(body);
+        
+        // Head
+        const headGeometry = new THREE.SphereGeometry(0.25 * scale, 12, 12);
+        const headMaterial = new THREE.MeshStandardMaterial({ color: 0xA0A0A0 });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = 1.6 * scale;
+        head.castShadow = true;
+        this.group.add(head);
+        
+        // Helmet
+        const helmetGeometry = new THREE.SphereGeometry(0.28 * scale, 12, 8);
+        const helmetMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x2A2A2A,
+            metalness: 0.7 
+        });
+        const helmet = new THREE.Mesh(helmetGeometry, helmetMaterial);
+        helmet.position.y = 1.65 * scale;
+        helmet.castShadow = true;
+        this.group.add(helmet);
         
         this.group.position.set(this.position.x, this.position.y, this.position.z);
         this.mesh = this.group;
     }
     
     createPhysicsBody() {
-        // Create physics body for collision (cylinder)
-        const shape = new CANNON.Cylinder(0.5, 0.5, 1.8, 12);
-        
-        this.body = new CANNON.Body({
-            mass: 100, // Heavy enemy
-            material: new CANNON.Material({
-                friction: 0.3,
-                restitution: 0.1
-            }),
-            fixedRotation: true // Prevent tumbling
-        });
-        
-        this.body.addShape(shape);
-        this.body.position.set(this.position.x, this.position.y + 0.9, this.position.z);
-        
-        // Add to physics world
-        this.world.addBody(this.body);
-        
-        console.log("Enemy physics body created");
+        try {
+            // Create physics body for collision (cylinder) that matches character scale
+            const characterScale = this.characterDesign ? this.characterDesign.enemyScale || 2.0 : 2.0;
+            const shape = new CANNON.Cylinder(0.5, 0.5, 1.8, 12);
+            
+            this.body = new CANNON.Body({
+                mass: 100, // Heavy enemy
+                material: new CANNON.Material({
+                    friction: 0.3,
+                    restitution: 0.1
+                }),
+                fixedRotation: true // Prevent tumbling
+            });
+            
+            this.body.addShape(shape);
+            // Position to match visual character
+            this.body.position.set(
+                this.position.x, 
+                this.position.y + (0.9 * characterScale), 
+                this.position.z
+            );
+            
+            // Add to physics world
+            this.world.addBody(this.body);
+            
+            console.log(`Enemy physics body created for ${this.name} with scale ${characterScale}`);
+        } catch (error) {
+            console.error(`Error creating enemy physics body for ${this.name}:`, error);
+        }
     }
     
     update(playerPosition, delta) {
         if (!this.body || !playerPosition) return;
         
-        // Update mesh position to match physics body
-        this.group.position.copy(this.body.position);
-        this.group.position.y -= 0.9; // Adjust for center offset
+        // Update mesh position to match physics body with proper scaling
+        if (this.group) {
+            this.group.position.copy(this.body.position);
+            // Adjust for character scale and center offset
+            const characterScale = this.characterDesign ? this.characterDesign.enemyScale || 2.0 : 2.0;
+            this.group.position.y -= (0.9 * characterScale);
+        }
         
         // Store previous state for animation changes
         this.previousState = this.state;

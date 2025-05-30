@@ -1,7 +1,9 @@
 class CharacterDesign {
     constructor() {
-        this.npcScale = 1.8;
-        this.enemyScale = 2.0;
+        // Standardize character scales for consistency
+        this.npcScale = 1.0; // Base scale - will be applied to entire group
+        this.enemyScale = 1.1; // Slightly larger enemies
+        this.characterHeight = 3.2; // Standard character height in world units
         
         this.nameDatabase = {
             civilian: [
@@ -32,11 +34,14 @@ class CharacterDesign {
     
     createNPCCharacter(type) {
         const group = new THREE.Group();
-        const scale = this.npcScale;
+        const scale = 1.0; // Use base scale for creation, apply npcScale to entire group
         
         this.createDetailedHumanoid(group, type, scale);
         
-        group.scale.setScalar(scale);
+        // Apply NPC scale to entire group for consistency
+        group.scale.setScalar(this.npcScale);
+        
+        console.log(`NPC character created with scale ${this.npcScale}, total height: ${this.characterHeight * this.npcScale}`);
         
         return group;
     }
@@ -44,7 +49,7 @@ class CharacterDesign {
     createEnemyCharacter() {
         const group = new THREE.Group();
         const weaponGroup = new THREE.Group();
-        const scale = this.enemyScale;
+        const scale = 1.0; // Use base scale for creation
         
         this.createDetailedHumanoid(group, 'enemy', scale);
         this.createEnemyWeapon(weaponGroup, scale);
@@ -52,7 +57,10 @@ class CharacterDesign {
         weaponGroup.position.set(0.4 * scale, 1.0 * scale, 0);
         group.add(weaponGroup);
         
-        group.scale.setScalar(scale);
+        // Apply enemy scale to entire group
+        group.scale.setScalar(this.enemyScale);
+        
+        console.log(`Enemy character created with scale ${this.enemyScale}, total height: ${this.characterHeight * this.enemyScale}`);
         
         return { group, weaponGroup };
     }
@@ -98,39 +106,40 @@ class CharacterDesign {
             
             // Create detailed head with facial features - Fixed positioning
             const headGroup = this.createDetailedHead(colors, scale);
-            headGroup.position.y = 1.6 * scale; // Adjusted height to fit better with body proportions
+            headGroup.position.y = 2.5 * scale; // Adjusted for proper head placement
             group.add(headGroup);
             
             // Create detailed torso
             const torsoGroup = this.createDetailedTorso(colors, scale);
-            torsoGroup.position.y = 1.1 * scale;
+            torsoGroup.position.y = 1.6 * scale; // Centered torso position
             group.add(torsoGroup);
             
             // Create detailed arms with hands
             const leftArmGroup = this.createDetailedArm(colors, scale, true);
-            leftArmGroup.position.set(-0.55 * scale, 1.2 * scale, 0);
+            leftArmGroup.position.set(-0.55 * scale, 1.8 * scale, 0); // Adjusted arm height
             group.add(leftArmGroup);
             
             const rightArmGroup = this.createDetailedArm(colors, scale, false);
-            rightArmGroup.position.set(0.55 * scale, 1.2 * scale, 0);
+            rightArmGroup.position.set(0.55 * scale, 1.8 * scale, 0); // Adjusted arm height
             group.add(rightArmGroup);
             
             // Create detailed legs with feet
             const leftLegGroup = this.createDetailedLeg(colors, scale, true);
-            leftLegGroup.position.set(-0.25 * scale, 0.35 * scale, 0);
+            leftLegGroup.position.set(-0.25 * scale, 0.8 * scale, 0); // Adjusted leg height
             group.add(leftLegGroup);
             
             const rightLegGroup = this.createDetailedLeg(colors, scale, false);
-            rightLegGroup.position.set(0.25 * scale, 0.35 * scale, 0);
+            rightLegGroup.position.set(0.25 * scale, 0.8 * scale, 0); // Adjusted leg height
             group.add(rightLegGroup);
             
             // Add character-specific accessories
             this.addCharacterAccessories(group, type, colors, scale);
             
-            // Store character data
+            // Store character data with height information
             group.userData = {
                 type: type,
                 scale: scale,
+                totalHeight: this.characterHeight * scale,
                 colors: colors,
                 components: {
                     head: headGroup,
@@ -142,11 +151,75 @@ class CharacterDesign {
                 }
             };
             
-            console.log(`Detailed ${type} character created with properly positioned facial features (scale: ${scale})`);
+            console.log(`Detailed ${type} character created with height ${this.characterHeight * scale} units`);
             
         } catch (error) {
             console.error("Error creating detailed humanoid character:", error);
+            // Create a simple fallback character
+            this.createSimpleFallbackCharacter(group, type, scale);
         }
+    }
+    
+    createSimpleFallbackCharacter(group, type, scale) {
+        console.log(`Creating simple fallback character for ${type}`);
+        
+        // Clear any existing children
+        while(group.children.length > 0) {
+            group.remove(group.children[0]);
+        }
+        
+        const colors = {
+            skin: 0xDDB592,
+            clothing: 0x4A5568,
+            pants: 0x2D3748,
+            shoes: 0x1A202C
+        };
+        
+        // Simple body
+        const bodyGeometry = new THREE.CylinderGeometry(0.35 * scale, 0.4 * scale, 1.4 * scale, 12);
+        const bodyMaterial = new THREE.MeshStandardMaterial({ color: colors.clothing });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 1.6 * scale;
+        body.castShadow = true;
+        group.add(body);
+        
+        // Simple head - ENSURE THIS IS ALWAYS CREATED
+        const headGeometry = new THREE.SphereGeometry(0.25 * scale, 12, 12);
+        const headMaterial = new THREE.MeshStandardMaterial({ color: colors.skin });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = 2.5 * scale; // Proper head position
+        head.castShadow = true;
+        group.add(head);
+        
+        // Simple arms
+        const armGeometry = new THREE.CylinderGeometry(0.08 * scale, 0.1 * scale, 1.0 * scale, 8);
+        const armMaterial = new THREE.MeshStandardMaterial({ color: colors.skin });
+        
+        const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+        leftArm.position.set(-0.5 * scale, 1.8 * scale, 0);
+        leftArm.castShadow = true;
+        group.add(leftArm);
+        
+        const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+        rightArm.position.set(0.5 * scale, 1.8 * scale, 0);
+        rightArm.castShadow = true;
+        group.add(rightArm);
+        
+        // Simple legs
+        const legGeometry = new THREE.CylinderGeometry(0.12 * scale, 0.15 * scale, 1.4 * scale, 8);
+        const legMaterial = new THREE.MeshStandardMaterial({ color: colors.pants });
+        
+        const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+        leftLeg.position.set(-0.2 * scale, 0.7 * scale, 0);
+        leftLeg.castShadow = true;
+        group.add(leftLeg);
+        
+        const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+        rightLeg.position.set(0.2 * scale, 0.7 * scale, 0);
+        rightLeg.castShadow = true;
+        group.add(rightLeg);
+        
+        console.log(`Simple fallback character created for ${type} with guaranteed head`);
     }
     
     createDetailedHead(colors, scale) {

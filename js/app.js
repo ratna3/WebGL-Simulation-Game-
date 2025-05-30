@@ -369,46 +369,103 @@ class Game {
         
         let npcCount = 0;
         let facesLoaded = 0;
+        let missingHeads = [];
         
         // Check NPCs
-        this.npcManager.npcs.forEach(npc => {
+        this.npcManager.npcs.forEach((npc, index) => {
             npcCount++;
             if (npc.group) {
+                let hasHead = false;
                 let hasFacialFeatures = false;
+                
                 npc.group.traverse(child => {
-                    if (child instanceof THREE.Mesh && child.material) {
-                        // Check if this might be a facial feature based on size and position
-                        const scale = child.scale.x;
-                        if (scale < 0.1 && child.position.y > 1.5) {
+                    if (child instanceof THREE.Mesh) {
+                        // Check for head (sphere geometry at proper height)
+                        if (child.geometry instanceof THREE.SphereGeometry && child.position.y > 2.0) {
+                            hasHead = true;
+                        }
+                        // Check for facial features (small meshes at head level)
+                        if (child.position.y > 2.0 && child.geometry instanceof THREE.SphereGeometry && 
+                            child.geometry.parameters && child.geometry.parameters.radius < 0.1) {
                             hasFacialFeatures = true;
                         }
                     }
                 });
-                if (hasFacialFeatures) facesLoaded++;
+                
+                if (hasHead) facesLoaded++;
+                if (!hasHead) {
+                    missingHeads.push(`NPC ${index}: ${npc.name || 'Unnamed'} (${npc.type})`);
+                    console.warn(`Missing head detected for NPC ${npc.name}:`, npc.group);
+                    
+                    // Attempt to fix missing head
+                    this.fixMissingHead(npc);
+                }
             }
         });
         
         // Check enemies
-        this.npcManager.enemies.forEach(enemy => {
+        this.npcManager.enemies.forEach((enemy, index) => {
             npcCount++;
             if (enemy.group) {
-                let hasFacialFeatures = false;
+                let hasHead = false;
+                
                 enemy.group.traverse(child => {
-                    if (child instanceof THREE.Mesh && child.material) {
-                        const scale = child.scale.x;
-                        if (scale < 0.1 && child.position.y > 1.5) {
-                            hasFacialFeatures = true;
-                        }
+                    if (child instanceof THREE.Mesh && child.geometry instanceof THREE.SphereGeometry && 
+                        child.position.y > 2.0) {
+                        hasHead = true;
                     }
                 });
-                if (hasFacialFeatures) facesLoaded++;
+                
+                if (hasHead) facesLoaded++;
+                if (!hasHead) {
+                    missingHeads.push(`Enemy ${index}: ${enemy.name || 'Unnamed'}`);
+                    console.warn(`Missing head detected for enemy ${enemy.name}:`, enemy.group);
+                    
+                    // Attempt to fix missing head
+                    this.fixMissingHead(enemy);
+                }
             }
         });
         
-        console.log(`Face verification: ${facesLoaded}/${npcCount} characters have facial features loaded`);
+        console.log(`Character verification: ${facesLoaded}/${npcCount} characters have heads loaded`);
+        
+        if (missingHeads.length > 0) {
+            console.warn(`Characters missing heads:`, missingHeads);
+        }
         
         if (facesLoaded === 0 && npcCount > 0) {
-            console.warn("No facial features detected on any characters - there may be a loading issue");
+            console.error("CRITICAL: No character heads detected - character system failure");
+        } else {
+            console.log(`Character system verification complete: ${Math.round(facesLoaded/npcCount*100)}% success rate`);
+        }
+    }
+    
+    fixMissingHead(character) {
+        if (!character || !character.group) return;
+        
+        console.log(`Attempting to fix missing head for ${character.name}`);
+        
+        try {
+            // Create emergency head
+            const headGeometry = new THREE.SphereGeometry(0.25, 12, 12);
+            const headMaterial = new THREE.MeshStandardMaterial({ 
+                color: character.type === 'enemy' ? 0xA0A0A0 : 0xDDB592 
+            });
+            const emergencyHead = new THREE.Mesh(headGeometry, headMaterial);
+            
+            // Position head properly based on character type
+            const scale = character.characterDesign ? 
+                (character.type === 'enemy' ? character.characterDesign.enemyScale : character.characterDesign.npcScale) : 1.0;
+            
+            emergencyHead.position.y = 2.5 * scale;
+            emergencyHead.castShadow = true;
+            emergencyHead.receiveShadow = true;
+            
+            character.group.add(emergencyHead);
+            
+            console.log(`Emergency head added to ${character.name} at height ${emergencyHead.position.y}`);
+        } catch (error) {
+            console.error(`Failed to fix missing head for ${character.name}:`, error);
         }
     }
     

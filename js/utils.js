@@ -174,8 +174,9 @@ const Utils = {
     // Character physics utilities
     createCharacterPhysics: function(world, position, scale = 1) {
         try {
-            // Create main body for character torso
-            const torsoShape = new CANNON.Cylinder(0.3 * scale, 0.3 * scale, 1.2 * scale, 8);
+            // Create torso shape that was missing
+            const torsoShape = new CANNON.Cylinder(0.4 * scale, 0.4 * scale, 1.6 * scale, 12);
+            
             const torsoBody = new CANNON.Body({
                 mass: 70,
                 material: new CANNON.Material({
@@ -186,7 +187,7 @@ const Utils = {
                 allowSleep: false
             });
             torsoBody.addShape(torsoShape);
-            torsoBody.position.set(position.x, position.y + 0.6 * scale, position.z);
+            torsoBody.position.set(position.x, position.y + 0.8 * scale, position.z);
             world.addBody(torsoBody);
 
             // Create leg collision bodies for stability
@@ -218,7 +219,7 @@ const Utils = {
                 type: CANNON.Body.KINEMATIC
             });
             leftLegBody.addShape(leftLegShape);
-            leftLegBody.position.set(position.x - 0.25 * scale, position.y - 0.2 * scale, position.z);
+            leftLegBody.position.set(position.x - 0.25 * scale, position.y + 0.5 * scale, position.z);
             world.addBody(leftLegBody);
             legBodies.push(leftLegBody);
             
@@ -233,14 +234,10 @@ const Utils = {
                 type: CANNON.Body.KINEMATIC
             });
             rightLegBody.addShape(rightLegShape);
-            rightLegBody.position.set(position.x + 0.25 * scale, position.y - 0.2 * scale, position.z);
+            rightLegBody.position.set(position.x + 0.25 * scale, position.y + 0.5 * scale, position.z);
             world.addBody(rightLegBody);
             legBodies.push(rightLegBody);
             
-            // Add foot bodies
-            const footBodies = this.createFootBodies(world, position, scale);
-            legBodies.push(...footBodies);
-
             return legBodies;
         } catch (error) {
             console.error("Error creating leg collision bodies:", error);
