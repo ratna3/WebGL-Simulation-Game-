@@ -26,6 +26,9 @@ class NPC {
         this.canTalk = true;
         this.dialogueCooldown = 0;
         this.lastInteractionTime = 0;
+        this.conversationCount = 0; // Track how many times player has talked to this NPC
+        this.mood = 'neutral'; // Current mood affects dialogue options
+        this.personality = this.generatePersonality(type); // Unique personality traits
         
         // Use character design system
         this.characterDesign = new CharacterDesign();
@@ -274,6 +277,17 @@ class NPC {
         }
     }
     
+    generatePersonality(type) {
+        const personalities = {
+            civilian: ['friendly', 'nervous', 'chatty', 'suspicious', 'helpful', 'grumpy', 'optimistic'],
+            criminal: ['cocky', 'paranoid', 'aggressive', 'cunning', 'boastful', 'secretive', 'sarcastic'],
+            police: ['professional', 'tired', 'suspicious', 'friendly', 'by-the-book', 'cynical', 'helpful']
+        };
+        
+        const typePersonalities = personalities[type] || personalities.civilian;
+        return typePersonalities[Math.floor(Math.random() * typePersonalities.length)];
+    }
+    
     // Method to start dialogue interaction
     startDialogue() {
         if (!this.canTalk || this.dialogueCooldown > 0 || this.isDead) {
@@ -282,7 +296,7 @@ class NPC {
         }
         
         if (window.game && window.game.dialogueSystem) {
-            console.log(`Starting dialogue with ${this.name} (${this.type})`);
+            console.log(`Starting dialogue with ${this.name} (${this.type}) - Conversation #${this.conversationCount + 1}`);
             
             // Stop walking during dialogue
             this.isWalking = false;
@@ -291,11 +305,17 @@ class NPC {
                 this.body.velocity.z = 0;
             }
             
+            // Increment conversation count
+            this.conversationCount++;
+            
+            // Update mood based on previous interactions and personality
+            this.updateMoodForConversation();
+            
             // Start dialogue
             window.game.dialogueSystem.startDialogue(this);
             
-            // Set cooldown to prevent spam
-            this.dialogueCooldown = 3000; // 3 second cooldown
+            // Set cooldown to prevent spam (shorter for more natural conversation)
+            this.dialogueCooldown = 2000; // 2 second cooldown
             this.lastInteractionTime = Date.now();
             
             return true;
@@ -305,9 +325,51 @@ class NPC {
         return false;
     }
     
+    updateMoodForConversation() {
+        // Adjust mood based on personality and previous interactions
+        if (this.conversationCount > 3) {
+            // NPC gets more familiar/annoyed with repeated conversations
+            switch(this.personality) {
+                case 'friendly':
+                case 'chatty':
+                    this.mood = 'familiar';
+                    break;
+                case 'grumpy':
+                case 'suspicious':
+                    this.mood = 'annoyed';
+                    break;
+                case 'nervous':
+                    this.mood = 'anxious';
+                    break;
+                default:
+                    this.mood = 'neutral';
+            }
+        } else if (this.conversationCount > 1) {
+            switch(this.personality) {
+                case 'friendly':
+                    this.mood = 'warming_up';
+                    break;
+                case 'suspicious':
+                    this.mood = 'cautious';
+                    break;
+                case 'chatty':
+                    this.mood = 'excited';
+                    break;
+                default:
+                    this.mood = 'neutral';
+            }
+        }
+        
+        // Random mood variations for more variety
+        if (Math.random() < 0.2) {
+            const randomMoods = ['tired', 'energetic', 'confused', 'amused'];
+            this.mood = randomMoods[Math.floor(Math.random() * randomMoods.length)];
+        }
+    }
+    
     // Method called when dialogue ends
     endDialogue() {
-        console.log(`Dialogue ended with ${this.name}`);
+        console.log(`Dialogue ended with ${this.name} (Total conversations: ${this.conversationCount})`);
         
         // Resume walking after a short delay
         setTimeout(() => {

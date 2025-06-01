@@ -24,7 +24,7 @@ class CharacterDesign {
             ],
             police: [
                 "Officer Malik", "Sergeant Khan", "Inspector Ahmad", "Captain Hassan", "Lieutenant Shah",
-                "Detective Rahman", "Commander Ali", "Chief Qureshi", "Deputy Hussain", "Constable Nazir"
+                "Detective Bunde", "Commander Spacco", "Chief Gerten", "Deputy Leahey", "Constable Nazir"
             ],
             enemy: [
                 "Alpha-1", "Bravo-2", "Charlie-3", "Delta-4", "Echo-5",
