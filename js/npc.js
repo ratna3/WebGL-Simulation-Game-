@@ -742,15 +742,15 @@ class Enemy {
     
     generateEnemyName() {
         const names = [
-            "REPO-Alpha", "REPO-Bravo", "REPO-Charlie", "REPO-Delta", 
-            "REPO-Echo", "REPO-Foxtrot", "REPO-Golf", "REPO-Hotel",
-            "REPO-India", "REPO-Juliet", "REPO-Kilo", "REPO-Lima"
+            "Alpha", "Bravo", "Charlie", "Delta", 
+            "Echo", "Foxtrot", "Golf", "Hotel",
+            "India", "Juliet", "Kilo", "Lima"
         ];
         return names[Math.floor(Math.random() * names.length)] + "-" + Math.floor(Math.random() * 100);
     }
 
     init() {
-        this.createRepoCharacter();
+        this.createEnemyCharacter();
         this.createPhysicsBody();
         this.scene.add(this.group);
         
@@ -763,45 +763,11 @@ class Enemy {
             this.animationManager.registerEnemy(this);
         }
         
-        console.log("REPO enemy created at position:", this.position);
+        console.log("Enemy created at position:", this.position);
         console.log("Patrol route generated with", this.patrolPoints.length, "points");
     }
     
-    generatePatrolRoute() {
-        // Create a patrol route around the spawn area
-        const numPoints = 4 + Math.floor(Math.random() * 4); // 4-8 patrol points
-        this.patrolPoints = [];
-        
-        for (let i = 0; i < numPoints; i++) {
-            const angle = (i / numPoints) * Math.PI * 2;
-            const radius = this.patrolRadius * (0.5 + Math.random() * 0.5); // Vary distance
-            
-            const patrolPoint = {
-                x: this.position.x + Math.cos(angle) * radius,
-                z: this.position.z + Math.sin(angle) * radius,
-                waitTime: 1000 + Math.random() * 3000 // Wait 1-4 seconds at each point
-            };
-            
-            this.patrolPoints.push(patrolPoint);
-        }
-        
-        // Add some random patrol points for variety
-        for (let i = 0; i < 2; i++) {
-            const randomAngle = Math.random() * Math.PI * 2;
-            const randomRadius = Math.random() * this.patrolRadius;
-            
-            this.patrolPoints.push({
-                x: this.position.x + Math.cos(randomAngle) * randomRadius,
-                z: this.position.z + Math.sin(randomAngle) * randomRadius,
-                waitTime: 2000 + Math.random() * 2000
-            });
-        }
-        
-        this.currentPatrolIndex = 0;
-        console.log(`Generated patrol route with ${this.patrolPoints.length} points for enemy`);
-    }
-    
-    createRepoCharacter() {
+    createEnemyCharacter() {
         try {
             // Use the character design system with proper scaling
             const result = this.characterDesign.createEnemyCharacter();
@@ -811,9 +777,9 @@ class Enemy {
             this.group.position.set(this.position.x, this.position.y, this.position.z);
             this.mesh = this.group;
             
-            console.log(`REPO character created for ${this.name} with scale ${this.characterDesign.enemyScale}`);
+            console.log(`Enemy character created for ${this.name} with scale ${this.characterDesign.enemyScale}`);
         } catch (error) {
-            console.error(`Error creating REPO character for ${this.name}:`, error);
+            console.error(`Error creating enemy character for ${this.name}:`, error);
             this.createFallbackEnemyCharacter();
         }
     }
@@ -1093,6 +1059,28 @@ class Enemy {
         }
     }
     
+    generatePatrolRoute() {
+        // Generate patrol points around the spawn position
+        this.patrolPoints = [];
+        const centerX = this.position.x;
+        const centerZ = this.position.z;
+        const numPoints = 4; // Square patrol pattern
+        
+        for (let i = 0; i < numPoints; i++) {
+            const angle = (Math.PI * 2 * i) / numPoints;
+            const x = centerX + Math.cos(angle) * this.patrolRadius;
+            const z = centerZ + Math.sin(angle) * this.patrolRadius;
+            
+            this.patrolPoints.push({
+                x: x,
+                y: this.position.y,
+                z: z
+            });
+        }
+        
+        console.log(`Patrol route generated for ${this.name}: ${this.patrolPoints.length} points`);
+    }
+    
     updateAI(playerPosition, delta) {
         if (!playerPosition) return;
         
@@ -1347,6 +1335,7 @@ class NPCManager {
         this.npcs = [];
         this.enemies = [];
         this.citySize = 400;
+        this.currentLevel = 1;
     }
     
     spawnCityNPCs() {
@@ -1416,7 +1405,7 @@ class NPCManager {
         
         const enemyCount = Math.min(10, Math.max(6, parkLocations.length * 2)); // 6-10 enemies
         
-        console.log(`Spawning ${enemyCount} REPO enemies near ${parkLocations.length} parks`);
+        console.log(`Spawning ${enemyCount} enemies near ${parkLocations.length} parks`);
         
         for (let i = 0; i < enemyCount; i++) {
             const parkIndex = i % parkLocations.length;
@@ -1429,7 +1418,7 @@ class NPCManager {
                 const enemy = new Enemy(this.scene, this.world, enemyPosition);
                 this.enemies.push(enemy);
                 
-                console.log(`REPO enemy ${i + 1} spawned near park at (${enemyPosition.x.toFixed(1)}, ${enemyPosition.z.toFixed(1)})`);
+                console.log(`Enemy ${i + 1} spawned near park at (${enemyPosition.x.toFixed(1)}, ${enemyPosition.z.toFixed(1)})`);
             }
         }
         
@@ -1568,6 +1557,107 @@ class NPCManager {
         
         return { enemy: nearest, distance: minDistance };
     }
+    
+    spawnEnemiesForLevel(level = 1) {
+        // Clear existing enemies first
+        this.clearEnemies();
+        
+        // Calculate enemy count based on level (starts low, increases gradually)
+        let enemyCount;
+        if (level === 1) {
+            enemyCount = 3; // Very easy start
+        } else if (level === 2) {
+            enemyCount = 5;
+        } else if (level === 3) {
+            enemyCount = 7;
+        } else if (level === 4) {
+            enemyCount = 9;
+        } else {
+            enemyCount = Math.min(15, 9 + (level - 4) * 2); // Cap at 15 enemies
+        }
+        
+        console.log(`Spawning ${enemyCount} enemies for level ${level}`);
+        
+        // Try to get park locations for strategic spawning
+        const environment = window.game.environment;
+        let spawnPositions = [];
+        
+        if (environment && environment.getParkLocations) {
+            const parkLocations = environment.getParkLocations();
+            
+            if (parkLocations && parkLocations.length > 0) {
+                // Spawn enemies near parks
+                for (let i = 0; i < enemyCount; i++) {
+                    const parkIndex = i % parkLocations.length;
+                    const parkLocation = parkLocations[parkIndex];
+                    const enemyPosition = this.getPositionNearPark(parkLocation);
+                    spawnPositions.push(enemyPosition);
+                }
+            } else {
+                spawnPositions = this.generateRandomSpawnPositions(enemyCount);
+            }
+        } else {
+            spawnPositions = this.generateRandomSpawnPositions(enemyCount);
+        }
+        
+        // Create enemies at calculated positions
+        for (let i = 0; i < enemyCount; i++) {
+            const position = spawnPositions[i];
+            if (position) {
+                const enemy = new Enemy(this.scene, this.world, position);
+                this.enemies.push(enemy);
+                console.log(`Enemy ${i + 1} spawned at (${position.x.toFixed(1)}, ${position.z.toFixed(1)})`);
+            }
+        }
+        
+        // Start mission with enemy count
+        if (window.game && window.game.missionManager) {
+            window.game.missionManager.startMission(this.enemies.length, level);
+        }
+        
+        this.currentLevel = level;
+        console.log(`Level ${level} started with ${this.enemies.length} enemies`);
+        
+        return this.enemies.length;
+    }
+    
+    generateRandomSpawnPositions(count) {
+        const positions = [];
+        for (let i = 0; i < count; i++) {
+            positions.push(this.getRandomCityPosition());
+        }
+        return positions;
+    }
+    
+    clearEnemies() {
+        // Remove existing enemies from scene and physics world
+        this.enemies.forEach(enemy => {
+            if (enemy.body && this.world) {
+                try {
+                    this.world.removeBody(enemy.body);
+                } catch (error) {
+                    console.warn("Error removing enemy physics body:", error);
+                }
+            }
+            if (enemy.group && this.scene) {
+                try {
+                    this.scene.remove(enemy.group);
+                } catch (error) {
+                    console.warn("Error removing enemy from scene:", error);
+                }
+            }
+        });
+        
+        this.enemies = [];
+        console.log("All enemies cleared");
+    }
+
+    // Keep existing spawnEnemiesNearParks method for compatibility
+    spawnEnemiesNearParks() {
+        return this.spawnEnemiesForLevel(1);
+    }
+    
+    // ...existing code...
 }
 
 // Make classes globally available

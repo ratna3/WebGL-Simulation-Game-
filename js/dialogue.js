@@ -214,6 +214,15 @@ class DialogueSystem {
                 ]
             },
             {
+                text: `We've had reports of armed criminals in the area. Stay alert and report anything unusual. These guys are dangerous and well-armed.`,
+                options: [
+                    { text: "Thanks for the warning. I'll keep my eyes open.", action: 'cooperative', suspicion: -5, rep: 'police' },
+                    { text: "Armed criminals? In this economy? What's the world coming to?", action: 'humor', suspicion: -5, rep: 'police', mood: 'amused' },
+                    { text: "Define 'unusual' in this neighborhood. That's a pretty low bar.", action: 'humor', suspicion: -8, rep: 'police', mood: 'laughing' },
+                    { text: "Maybe you should handle it. That's what we pay you for.", action: 'dismissive', suspicion: 5, rep: 'police' }
+                ]
+            },
+            {
                 text: `Back for more questions? You're more persistent than my ex-wife's lawyer. What's on your mind this time, citizen?`,
                 options: [
                     { text: "Just wanted to see if you've caught any criminals since we last talked.", action: 'humor', suspicion: -5, rep: 'police', mood: 'amused' },

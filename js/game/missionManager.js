@@ -6,6 +6,8 @@ class MissionManager {
         this.enemiesKilled = 0;
         this.missionActive = false;
         this.missionComplete = false;
+        this.currentLevel = 1;
+        this.maxLevel = 10; // Maximum level
         
         console.log("MissionManager initialized");
     }
@@ -26,13 +28,14 @@ class MissionManager {
         return "Agent Smith";
     }
     
-    startMission(enemyCount) {
+    startMission(enemyCount, level = 1) {
         this.totalEnemies = enemyCount;
         this.enemiesKilled = 0;
         this.missionActive = true;
         this.missionComplete = false;
+        this.currentLevel = level;
         
-        console.log(`Mission started: Eliminate ${this.totalEnemies} enemies`);
+        console.log(`Level ${level} started: Eliminate ${this.totalEnemies} enemies`);
         this.updateMissionDisplay();
     }
     
@@ -59,13 +62,80 @@ class MissionManager {
         this.missionActive = false;
         this.missionComplete = true;
         
-        console.log("Mission Complete!");
+        console.log(`Level ${this.currentLevel} Complete!`);
         
-        // Show congratulations screen
-        this.showCongratulations();
+        // Check if there are more levels
+        if (this.currentLevel < this.maxLevel) {
+            this.showLevelCompleteScreen();
+        } else {
+            this.showFinalVictoryScreen();
+        }
     }
     
-    showCongratulations() {
+    showLevelCompleteScreen() {
+        const levelCompleteOverlay = document.createElement('div');
+        levelCompleteOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-family: 'Courier New', monospace;
+        `;
+        
+        levelCompleteOverlay.innerHTML = `
+            <div style="text-align: center; color: white; max-width: 600px;">
+                <h1 style="color: #00ff00; font-size: 48px; margin-bottom: 20px; text-shadow: 0 0 20px #00ff00;">
+                    LEVEL ${this.currentLevel} COMPLETE!
+                </h1>
+                
+                <h2 style="color: #ff3e3e; font-size: 32px; margin-bottom: 30px;">
+                    Well Done, Detective ${this.playerName}
+                </h2>
+                
+                <div style="background: rgba(0,255,0,0.1); border: 2px solid #00ff00; padding: 20px; border-radius: 10px; margin-bottom: 30px;">
+                    <h3 style="color: #00ff00; margin-bottom: 15px;">LEVEL REPORT</h3>
+                    <p style="font-size: 18px; line-height: 1.5;">
+                        <strong>Level:</strong> ${this.currentLevel}<br>
+                        <strong>Enemies Eliminated:</strong> ${this.enemiesKilled}<br>
+                        <strong>Status:</strong> <span style="color: #00ff00;">SUCCESS</span><br><br>
+                        Prepare for the next wave of enemies, ${this.playerName}.
+                    </p>
+                </div>
+                
+                <button onclick="this.nextLevel()" 
+                        style="background: #ff3e3e; color: white; border: none; padding: 15px 30px; 
+                               font-size: 18px; border-radius: 5px; cursor: pointer; margin-right: 15px;">
+                    NEXT LEVEL
+                </button>
+                
+                <button onclick="this.exitGame()" 
+                        style="background: #666; color: white; border: none; padding: 15px 30px; 
+                               font-size: 18px; border-radius: 5px; cursor: pointer;">
+                    EXIT
+                </button>
+            </div>
+        `;
+        
+        // Add button functionality
+        levelCompleteOverlay.querySelector('button').onclick = () => {
+            document.body.removeChild(levelCompleteOverlay);
+            this.startNextLevel();
+        };
+        
+        levelCompleteOverlay.querySelectorAll('button')[1].onclick = () => {
+            window.location.reload();
+        };
+        
+        document.body.appendChild(levelCompleteOverlay);
+    }
+    
+    showFinalVictoryScreen() {
         const congratsOverlay = document.createElement('div');
         congratsOverlay.style.cssText = `
             position: fixed;
@@ -92,26 +162,26 @@ class MissionManager {
                 </h2>
                 
                 <div style="background: rgba(0,255,0,0.1); border: 2px solid #00ff00; padding: 20px; border-radius: 10px; margin-bottom: 30px;">
-                    <h3 style="color: #00ff00; margin-bottom: 15px;">MISSION REPORT</h3>
+                    <h3 style="color: #00ff00; margin-bottom: 15px;">FINAL MISSION REPORT</h3>
                     <p style="font-size: 18px; line-height: 1.5;">
-                        Agent <strong>${this.playerName}</strong> has successfully completed the undercover operation.<br><br>
-                        <strong>Enemies Eliminated:</strong> ${this.enemiesKilled}<br>
-                        <strong>Mission Status:</strong> <span style="color: #00ff00;">SUCCESS</span><br>
-                        <strong>Cover Status:</strong> Maintained<br><br>
-                        The criminal organization has been neutralized.<br>
+                        Agent <strong>${this.playerName}</strong> has successfully completed all ${this.maxLevel} levels.<br><br>
+                        <strong>Levels Completed:</strong> ${this.maxLevel}<br>
+                        <strong>Final Level Enemies:</strong> ${this.enemiesKilled}<br>
+                        <strong>Mission Status:</strong> <span style="color: #00ff00;">PERFECT SUCCESS</span><br><br>
+                        The criminal organization has been completely neutralized.<br>
                         The city is now safe thanks to your efforts, ${this.playerName}.
                     </p>
                 </div>
                 
                 <div style="margin-bottom: 30px;">
                     <h3 style="color: #ffff00; margin-bottom: 10px;">ACHIEVEMENT UNLOCKED</h3>
-                    <p style="color: #ffff00;">🏆 Master Detective - Complete the undercover mission as ${this.playerName}</p>
+                    <p style="color: #ffff00;">🏆 Ultimate Detective - Complete all levels as ${this.playerName}</p>
                 </div>
                 
                 <button onclick="this.restartMission()" 
                         style="background: #ff3e3e; color: white; border: none; padding: 15px 30px; 
                                font-size: 18px; border-radius: 5px; cursor: pointer; margin-right: 15px;">
-                    NEW MISSION
+                    PLAY AGAIN
                 </button>
                 
                 <button onclick="this.exitGame()" 
@@ -124,7 +194,6 @@ class MissionManager {
         
         // Add button functionality
         congratsOverlay.querySelector('button').onclick = () => {
-            // Restart mission
             document.body.removeChild(congratsOverlay);
             if (window.game) {
                 window.game.restartMission();
@@ -132,14 +201,29 @@ class MissionManager {
         };
         
         congratsOverlay.querySelectorAll('button')[1].onclick = () => {
-            // Exit game - go back to agent naming
             window.location.reload();
         };
         
         document.body.appendChild(congratsOverlay);
         
-        // Play victory sound (if available)
+        // Play victory sound
         this.playVictorySound();
+    }
+    
+    startNextLevel() {
+        this.currentLevel++;
+        console.log(`Starting level ${this.currentLevel}`);
+        
+        // Reset mission state
+        this.missionActive = false;
+        this.missionComplete = false;
+        this.enemiesKilled = 0;
+        
+        // Spawn enemies for next level
+        if (window.game && window.game.npcManager) {
+            const enemyCount = window.game.npcManager.spawnEnemiesForLevel(this.currentLevel);
+            console.log(`Level ${this.currentLevel} started with ${enemyCount} enemies`);
+        }
     }
     
     playVictorySound() {
@@ -192,7 +276,7 @@ class MissionManager {
         if (this.missionActive) {
             const progressPercent = this.totalEnemies > 0 ? (this.enemiesKilled / this.totalEnemies) * 100 : 0;
             missionElement.innerHTML = `
-                <h4 style="color: #ff3e3e; margin-bottom: 10px;">MISSION PROGRESS</h4>
+                <h4 style="color: #ff3e3e; margin-bottom: 10px;">LEVEL ${this.currentLevel} PROGRESS</h4>
                 <p>Agent: ${this.playerName}</p>
                 <p>Enemies Eliminated: <span style="color: #00ff00;">${this.enemiesKilled}</span>/<span style="color: #ff3e3e;">${this.totalEnemies}</span></p>
                 <div style="width: 200px; height: 10px; background: #333; border-radius: 5px; margin-top: 10px;">
@@ -201,13 +285,13 @@ class MissionManager {
             `;
         } else if (this.missionComplete) {
             missionElement.innerHTML = `
-                <h4 style="color: #00ff00;">MISSION COMPLETE!</h4>
+                <h4 style="color: #00ff00;">LEVEL ${this.currentLevel} COMPLETE!</h4>
                 <p>Agent: ${this.playerName}</p>
                 <p style="color: #00ff00;">All enemies eliminated!</p>
             `;
         }
         
-        console.log(`Mission display updated: ${this.enemiesKilled}/${this.totalEnemies}`);
+        console.log(`Mission display updated: Level ${this.currentLevel} - ${this.enemiesKilled}/${this.totalEnemies}`);
     }
     
     getMissionStatus() {

@@ -348,9 +348,9 @@ class Game {
             this.npcManager.spawnCityNPCs();
             console.log("City NPCs spawned with facial features");
             
-            // Spawn enemies near parks
-            const enemyCount = this.npcManager.spawnEnemiesNearParks();
-            console.log(`${enemyCount} enemies spawned near parks with facial features`);
+            // Spawn enemies for level 1 (start easy)
+            const enemyCount = this.npcManager.spawnEnemiesForLevel(1);
+            console.log(`${enemyCount} enemies spawned for level 1 with facial features`);
             
             // Verify that NPCs have facial features
             setTimeout(() => {
@@ -647,14 +647,10 @@ class Game {
             if (npc.body) this.world.removeBody(npc.body);
             if (npc.group) this.scene.remove(npc.group);
         });
-        this.npcManager.enemies.forEach(enemy => {
-            if (enemy.body) this.world.removeBody(enemy.body);
-            if (enemy.group) this.scene.remove(enemy.group);
-        });
+        this.npcManager.clearEnemies();
         
         // Reset arrays
         this.npcManager.npcs = [];
-        this.npcManager.enemies = [];
         
         // Respawn
         this.setupNPCs();
@@ -666,7 +662,7 @@ class Game {
         }
         
         this.isGameActive = true;
-        console.log("Mission restarted with animation system");
+        console.log("Mission restarted with level 1");
     }
     
     showMissionBriefing() {
@@ -707,6 +703,7 @@ class Game {
                         <li>Maintain your cover identity as ${agentName}</li>
                         <li>Eliminate hostile targets when discovered</li>
                         <li>Avoid civilian casualties</li>
+                        <li>Progress through multiple levels of increasing difficulty</li>
                     </ul>
                     
                     <p><strong>Key Personnel:</strong></p>
@@ -714,7 +711,7 @@ class Game {
                         <li><span style="color: #ff4444;">Criminals</span> - Your targets, gather intel or eliminate</li>
                         <li><span style="color: #4444ff;">Police</span> - Avoid suspicion, maintain cover</li>
                         <li><span style="color: #888888;">Civilians</span> - Innocent bystanders, do not harm</li>
-                        <li><span style="color: #ff6600;">REPO Units</span> - Highly dangerous, eliminate on sight</li>
+                        <li><span style="color: #ff6600;">Enemies</span> - Highly dangerous, eliminate on sight</li>
                     </ul>
                     
                     <p><strong>Controls:</strong></p>
@@ -725,6 +722,14 @@ class Game {
                         <li>Tab - Equip/Holster weapon</li>
                         <li>Left Click - Shoot (when weapon equipped)</li>
                         <li>R - Reload weapon</li>
+                    </ul>
+                    
+                    <p><strong>Level System:</strong></p>
+                    <ul>
+                        <li>Level 1: 3 enemies (Easy start)</li>
+                        <li>Level 2: 5 enemies</li>
+                        <li>Level 3+: Gradually increasing difficulty</li>
+                        <li>Complete all levels to win the game</li>
                     </ul>
                     
                     <p><strong>WARNING:</strong> Using your weapon will blow your cover. Use it only when necessary!</p>
@@ -742,6 +747,7 @@ class Game {
         
         console.log(`Mission Controls: WASD to move, E to interact, Tab for weapon, Left Click to shoot`);
         console.log(`Your cover identity: ${agentName} working undercover`);
+        console.log("Level system: Start with 3 enemies, increase each level");
         console.log("Weapon is initially holstered - press Tab to equip when needed");
     }
     
