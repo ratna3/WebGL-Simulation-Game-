@@ -30,11 +30,51 @@ class NPC {
         this.mood = 'neutral'; // Current mood affects dialogue options
         this.personality = this.generatePersonality(type); // Unique personality traits
         
+        // Enhanced visual distinction properties
+        this.visualTheme = this.generateVisualTheme(type);
+        
         // Use character design system
         this.characterDesign = new CharacterDesign();
         this.name = this.characterDesign.generateCharacterName(type);
         
-        console.log(`${type} NPC created: ${this.name} - will walk in circles and can be talked to`);
+        console.log(`${type} NPC created: ${this.name} - ${this.visualTheme.description}`);
+    }
+    
+    generateVisualTheme(type) {
+        const themes = {
+            civilian: {
+                description: 'friendly civilian',
+                bodyColor: 0x4A90E2, // Friendly blue
+                headColor: 0xDDB592, // Natural skin tone
+                clothingColor: 0x2E8B57, // Sea green clothing
+                accentColor: 0xFFD700, // Gold accents
+                height: 1.5,
+                build: 'normal',
+                accessory: 'hat'
+            },
+            criminal: {
+                description: 'suspicious criminal',
+                bodyColor: 0x8B0000, // Dark red
+                headColor: 0xD2B48C, // Tan skin
+                clothingColor: 0x2F2F2F, // Dark clothing
+                accentColor: 0xFF4500, // Orange red accents
+                height: 1.6,
+                build: 'broad',
+                accessory: 'sunglasses'
+            },
+            police: {
+                description: 'police officer',
+                bodyColor: 0x000080, // Navy blue uniform
+                headColor: 0xDDB592, // Natural skin
+                clothingColor: 0x4169E1, // Royal blue
+                accentColor: 0xC0C0C0, // Silver badge
+                height: 1.7,
+                build: 'fit',
+                accessory: 'badge'
+            }
+        };
+        
+        return themes[type] || themes.civilian;
     }
     
     init() {
@@ -46,30 +86,261 @@ class NPC {
     
     createCharacter() {
         try {
-            // Use the character design system
-            this.group = this.characterDesign.createNPCCharacter(this.type);
+            console.log(`Creating enhanced ${this.type} character: ${this.name}`);
+            
+            // Create main character group
+            this.group = new THREE.Group();
+            
+            // Enhanced character creation with visual themes
+            this.createEnhancedCharacterBody();
+            this.addDistinctiveFeatures();
+            this.addTypeSpecificAccessories();
+            
+            // Position the group
             this.group.position.set(this.position.x, this.position.y, this.position.z);
             this.mesh = this.group;
             
-            // Ensure all facial features are visible
-            this.group.traverse((child) => {
-                if (child instanceof THREE.Mesh) {
-                    child.visible = true;
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                    
-                    // Ensure materials are properly set
-                    if (child.material) {
-                        child.material.needsUpdate = true;
-                    }
-                }
-            });
-            
-            console.log(`${this.type} NPC character created with facial features:`, this.name);
+            console.log(`Enhanced ${this.type} character created successfully: ${this.name}`);
         } catch (error) {
-            console.error("Error creating NPC character:", error);
-            // Fallback to simple character if detailed creation fails
+            console.error(`Error creating ${this.type} character:`, error);
             this.createSimpleFallbackCharacter();
+        }
+    }
+    
+    createEnhancedCharacterBody() {
+        const theme = this.visualTheme;
+        
+        // Enhanced body with theme colors
+        const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.35, theme.height, 12);
+        const bodyMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.bodyColor,
+            metalness: 0.1,
+            roughness: 0.8
+        });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = theme.height / 2;
+        body.castShadow = true;
+        body.receiveShadow = true;
+        this.group.add(body);
+        
+        // Enhanced head with proper positioning
+        const headGeometry = new THREE.SphereGeometry(0.28, 16, 16);
+        const headMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.headColor,
+            metalness: 0.0,
+            roughness: 0.9
+        });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = theme.height + 0.5; // Proper head positioning above body
+        head.castShadow = true;
+        head.receiveShadow = true;
+        this.group.add(head);
+        
+        // Add facial features for better identification
+        this.addFacialFeatures(head, theme);
+        
+        // Enhanced legs with theme styling
+        this.addStyledLegs(theme);
+        
+        // Add clothing details
+        this.addClothingDetails(theme);
+    }
+    
+    addFacialFeatures(head, theme) {
+        // Eyes
+        const eyeGeometry = new THREE.SphereGeometry(0.04, 8, 8);
+        const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+        
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        leftEye.position.set(-0.08, 0.05, 0.22);
+        head.add(leftEye);
+        
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        rightEye.position.set(0.08, 0.05, 0.22);
+        head.add(rightEye);
+        
+        // Nose
+        const noseGeometry = new THREE.SphereGeometry(0.03, 6, 6);
+        const noseMaterial = new THREE.MeshStandardMaterial({ 
+            color: new THREE.Color(theme.headColor).multiplyScalar(0.9) 
+        });
+        const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+        nose.position.set(0, -0.02, 0.25);
+        head.add(nose);
+        
+        // Mouth indicator
+        const mouthGeometry = new THREE.SphereGeometry(0.02, 6, 6);
+        const mouthMaterial = new THREE.MeshStandardMaterial({ color: 0x8B0000 });
+        const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+        mouth.position.set(0, -0.08, 0.23);
+        head.add(mouth);
+    }
+    
+    addStyledLegs(theme) {
+        // Enhanced cone legs with theme colors
+        const legGeometry = new THREE.ConeGeometry(0.18, 0.9, 10);
+        const legMaterial = new THREE.MeshStandardMaterial({ 
+            color: new THREE.Color(theme.clothingColor).multiplyScalar(0.8),
+            metalness: 0.2,
+            roughness: 0.7
+        });
+        
+        // Left leg
+        const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+        leftLeg.position.set(-0.2, 0.45, 0);
+        leftLeg.rotation.x = Math.PI;
+        leftLeg.castShadow = true;
+        leftLeg.receiveShadow = true;
+        this.group.add(leftLeg);
+        
+        // Right leg
+        const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+        rightLeg.position.set(0.2, 0.45, 0);
+        rightLeg.rotation.x = Math.PI;
+        rightLeg.castShadow = true;
+        rightLeg.receiveShadow = true;
+        this.group.add(rightLeg);
+    }
+    
+    addClothingDetails(theme) {
+        // Add a chest piece for clothing detail
+        const chestGeometry = new THREE.CylinderGeometry(0.25, 0.28, 0.4, 12);
+        const chestMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.clothingColor,
+            metalness: 0.0,
+            roughness: 0.9
+        });
+        const chest = new THREE.Mesh(chestGeometry, chestMaterial);
+        chest.position.y = theme.height * 0.8;
+        chest.castShadow = true;
+        chest.receiveShadow = true;
+        this.group.add(chest);
+    }
+    
+    addDistinctiveFeatures() {
+        const theme = this.visualTheme;
+        
+        switch(this.type) {
+            case 'civilian':
+                this.addCivilianFeatures(theme);
+                break;
+            case 'criminal':
+                this.addCriminalFeatures(theme);
+                break;
+            case 'police':
+                this.addPoliceFeatures(theme);
+                break;
+        }
+    }
+    
+    addCivilianFeatures(theme) {
+        // Friendly hat
+        const hatGeometry = new THREE.CylinderGeometry(0.32, 0.32, 0.1, 12);
+        const hatMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.accentColor,
+            metalness: 0.1,
+            roughness: 0.8
+        });
+        const hat = new THREE.Mesh(hatGeometry, hatMaterial);
+        hat.position.y = theme.height + 0.8;
+        hat.castShadow = true;
+        this.group.add(hat);
+        
+        // Friendly badge/button
+        const buttonGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+        const buttonMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.accentColor,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+        const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+        button.position.set(0, theme.height * 0.9, 0.3);
+        button.castShadow = true;
+        this.group.add(button);
+        
+        console.log(`Added civilian features for ${this.name}`);
+    }
+    
+    addCriminalFeatures(theme) {
+        // Dark sunglasses
+        const glassesGeometry = new THREE.BoxGeometry(0.25, 0.08, 0.05);
+        const glassesMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x000000,
+            metalness: 0.9,
+            roughness: 0.1
+        });
+        const glasses = new THREE.Mesh(glassesGeometry, glassesMaterial);
+        glasses.position.set(0, theme.height + 0.55, 0.22);
+        glasses.castShadow = true;
+        this.group.add(glasses);
+        
+        // Weapon holster indication
+        const holsterGeometry = new THREE.BoxGeometry(0.1, 0.2, 0.05);
+        const holsterMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x2F2F2F,
+            metalness: 0.4,
+            roughness: 0.6
+        });
+        const holster = new THREE.Mesh(holsterGeometry, holsterMaterial);
+        holster.position.set(0.4, theme.height * 0.7, 0);
+        holster.castShadow = true;
+        this.group.add(holster);
+        
+        console.log(`Added criminal features for ${this.name}`);
+    }
+    
+    addPoliceFeatures(theme) {
+        // Police badge
+        const badgeGeometry = new THREE.BoxGeometry(0.08, 0.08, 0.02);
+        const badgeMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.accentColor,
+            metalness: 0.9,
+            roughness: 0.1
+        });
+        const badge = new THREE.Mesh(badgeGeometry, badgeMaterial);
+        badge.position.set(-0.25, theme.height * 0.85, 0.25);
+        badge.castShadow = true;
+        this.group.add(badge);
+        
+        // Police hat
+        const hatGeometry = new THREE.CylinderGeometry(0.3, 0.35, 0.15, 12);
+        const hatMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.bodyColor,
+            metalness: 0.2,
+            roughness: 0.7
+        });
+        const hat = new THREE.Mesh(hatGeometry, hatMaterial);
+        hat.position.y = theme.height + 0.82;
+        hat.castShadow = true;
+        this.group.add(hat);
+        
+        // Hat badge
+        const hatBadgeGeometry = new THREE.SphereGeometry(0.04, 8, 8);
+        const hatBadgeMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.accentColor,
+            metalness: 1.0,
+            roughness: 0.0
+        });
+        const hatBadge = new THREE.Mesh(hatBadgeGeometry, hatBadgeMaterial);
+        hatBadge.position.set(0, theme.height + 0.87, 0.28);
+        hatBadge.castShadow = true;
+        this.group.add(hatBadge);
+        
+        console.log(`Added police features for ${this.name}`);
+    }
+    
+    addTypeSpecificAccessories() {
+        // This method is called from addAccessories() in the existing code
+        switch(this.type) {
+            case 'civilian':
+                // Add civilian-specific accessories if needed
+                break;
+            case 'criminal':
+                // Add criminal-specific accessories if needed
+                break;
+            case 'police':
+                // Add police-specific accessories if needed
+                break;
         }
     }
     
@@ -677,67 +948,45 @@ class Enemy {
     constructor(scene, world, position) {
         this.scene = scene;
         this.world = world;
-        this.position = position || { x: 5, y: 0, z: 5 };
+        this.position = position || { x: 0, y: 0, z: 0 };
+        this.type = 'enemy';
         
-        // Add unique identifier for debugging
-        this.id = 'enemy_' + Math.random().toString(36).substr(2, 9);
-        this.name = this.generateEnemyName();
-        
-        // Enemy properties - CRITICAL: Exactly 160 health for 4-shot kills with 40 damage bullets
-        this.health = 160;
-        this.maxHealth = 160;
-        this.speed = 2;
-        this.attackDamage = 25;
-        this.detectionRange = 15;
-        this.attackRange = 2;
-        this.isDead = false;
-        
-        // Weapon properties
-        this.hasWeapon = true;
-        this.ammo = 15;
-        this.weaponRange = 20;
-        this.lastShotTime = 0;
-        this.shotCooldown = 1200;
-        this.accuracy = 0.7;
-        
-        // 3D objects
         this.mesh = null;
         this.body = null;
         this.group = new THREE.Group();
-        this.weaponGroup = new THREE.Group();
+        this.health = 100;
+        this.maxHealth = 100;
+        this.isDead = false;
+        this.isEnemy = true; // Important identifier
         
-        // AI state - Enhanced for animations and cover system
+        // Enhanced enemy visual theme
+        this.visualTheme = {
+            description: 'dangerous enemy operative',
+            bodyColor: 0x8B0000, // Dark red
+            headColor: 0x696969, // Dark gray skin
+            clothingColor: 0x000000, // Black tactical gear
+            accentColor: 0xFF0000, // Bright red accents
+            height: 1.8, // Taller than civilians
+            build: 'muscular',
+            accessory: 'tactical_gear'
+        };
+        
+        // AI and combat properties
+        this.alertRadius = 15;
+        this.detectionRange = 20;
+        this.shootRange = 25;
+        this.lastShotTime = 0;
+        this.shotCooldown = 1000;
+        
         this.state = 'patrol';
-        this.previousState = 'patrol';
         this.target = null;
-        this.lastAttackTime = 0;
-        this.attackCooldown = 2000;
-        this.playerDetected = false;
+        this.isHostile = true;
+        this.moveSpeed = 3;
         
-        // Enhanced movement for automatic patrolling
-        this.patrolPoints = [];
-        this.currentPatrolIndex = 0;
-        this.patrolRadius = 25; // Larger patrol area
-        this.lastPatrolUpdate = 0;
-        this.patrolUpdateInterval = 5000; // Change direction every 5 seconds
-        this.isMoving = true; // Always moving unless attacking
-        this.patrolSpeed = 0.8; // Patrol movement speed
+        // Generate enemy name
+        this.name = this.generateEnemyName();
         
-        // Cover system integration
-        this.coverThreshold = 60; // Attack when player cover below 60%
-        this.suspicionLevel = 0;
-        this.maxSuspicion = 100;
-        this.suspicionDecayRate = 5; // Suspicion decreases over time
-        
-        // Animation integration
-        this.animationManager = null;
-        
-        // Use character design system
-        this.characterDesign = new CharacterDesign();
-        
-        console.log(`Enemy ${this.name} created with ID: ${this.id}, Health: ${this.health} - will die in exactly 4 shots (40 damage each)`);
-        console.log(`Enemy will attack when player cover drops below ${this.coverThreshold}%`);
-        this.init();
+        console.log(`Enhanced enemy created: ${this.name} - ${this.visualTheme.description}`);
     }
     
     generateEnemyName() {
@@ -769,562 +1018,175 @@ class Enemy {
     
     createEnemyCharacter() {
         try {
-            // Use the character design system with proper scaling
-            const result = this.characterDesign.createEnemyCharacter();
-            this.group = result.group;
-            this.weaponGroup = result.weaponGroup;
+            console.log(`Creating enhanced enemy character: ${this.name}`);
+            
+            this.group = new THREE.Group();
+            
+            // Create distinctive enemy appearance
+            this.createTacticalBody();
+            this.addTacticalGear();
+            this.addEnemyIdentifiers();
             
             this.group.position.set(this.position.x, this.position.y, this.position.z);
             this.mesh = this.group;
             
-            console.log(`Enemy character created for ${this.name} with scale ${this.characterDesign.enemyScale}`);
+            console.log(`Enhanced enemy character created: ${this.name}`);
         } catch (error) {
-            console.error(`Error creating enemy character for ${this.name}:`, error);
+            console.error(`Error creating enemy character:`, error);
             this.createFallbackEnemyCharacter();
         }
     }
     
-    createFallbackEnemyCharacter() {
-        // Fallback enemy character if detailed creation fails
-        console.log(`Creating fallback enemy character for ${this.name}`);
+    createTacticalBody() {
+        const theme = this.visualTheme;
         
-        this.group = new THREE.Group();
-        const scale = 2.0; // Match enemy scale
-        
-        // Body
-        const bodyGeometry = new THREE.CylinderGeometry(0.35 * scale, 0.4 * scale, 1.4 * scale, 12);
-        const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x4A5568 });
+        // Larger, more intimidating body
+        const bodyGeometry = new THREE.CylinderGeometry(0.35, 0.4, theme.height, 12);
+        const bodyMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.bodyColor,
+            metalness: 0.3,
+            roughness: 0.6
+        });
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        body.position.y = 0.7 * scale;
+        body.position.y = theme.height / 2;
         body.castShadow = true;
+        body.receiveShadow = true;
         this.group.add(body);
         
-        // Head
-        const headGeometry = new THREE.SphereGeometry(0.25 * scale, 12, 12);
-        const headMaterial = new THREE.MeshStandardMaterial({ color: 0xA0A0A0 });
+        // Menacing head
+        const headGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+        const headMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.headColor,
+            metalness: 0.1,
+            roughness: 0.8
+        });
         const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.y = 1.6 * scale;
+        head.position.y = theme.height + 0.55; // Proper positioning
         head.castShadow = true;
+        head.receiveShadow = true;
         this.group.add(head);
         
-        // Helmet
-        const helmetGeometry = new THREE.SphereGeometry(0.28 * scale, 12, 8);
+        // Add menacing facial features
+        this.addEnemyFacialFeatures(head, theme);
+        
+        // Tactical legs
+        this.addTacticalLegs(theme);
+    }
+    
+    addEnemyFacialFeatures(head, theme) {
+        // Red glowing eyes for identification
+        const eyeGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+        const eyeMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xFF0000,
+            emissive: 0x330000,
+            metalness: 0.0,
+            roughness: 0.3
+        });
+        
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        leftEye.position.set(-0.08, 0.05, 0.25);
+        head.add(leftEye);
+        
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        rightEye.position.set(0.08, 0.05, 0.25);
+        head.add(rightEye);
+        
+        // Scar or tactical face paint
+        const scarGeometry = new THREE.BoxGeometry(0.02, 0.15, 0.01);
+        const scarMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x8B0000,
+            metalness: 0.0,
+            roughness: 1.0
+        });
+        const scar = new THREE.Mesh(scarGeometry, scarMaterial);
+        scar.position.set(0.12, 0.0, 0.24);
+        scar.rotation.z = Math.PI / 6;
+        head.add(scar);
+    }
+    
+    addTacticalLegs(theme) {
+        // Heavy tactical boots/legs
+        const legGeometry = new THREE.CylinderGeometry(0.15, 0.2, 1.0, 12);
+        const legMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.clothingColor,
+            metalness: 0.4,
+            roughness: 0.5
+        });
+        
+        // Left leg
+        const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+        leftLeg.position.set(-0.22, 0.5, 0);
+        leftLeg.castShadow = true;
+        leftLeg.receiveShadow = true;
+        this.group.add(leftLeg);
+        
+        // Right leg
+        const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+        rightLeg.position.set(0.22, 0.5, 0);
+        rightLeg.castShadow = true;
+        rightLeg.receiveShadow = true;
+        this.group.add(rightLeg);
+    }
+    
+    addTacticalGear() {
+        const theme = this.visualTheme;
+        
+        // Tactical vest
+        const vestGeometry = new THREE.CylinderGeometry(0.32, 0.37, 0.6, 12);
+        const vestMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.clothingColor,
+            metalness: 0.5,
+            roughness: 0.4
+        });
+        const vest = new THREE.Mesh(vestGeometry, vestMaterial);
+        vest.position.y = theme.height * 0.75;
+        vest.castShadow = true;
+        vest.receiveShadow = true;
+        this.group.add(vest);
+        
+        // Weapon attachment
+        const weaponGeometry = new THREE.BoxGeometry(0.05, 0.3, 0.05);
+        const weaponMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x2F2F2F,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+        const weapon = new THREE.Mesh(weaponGeometry, weaponMaterial);
+        weapon.position.set(0.4, theme.height * 0.8, 0);
+        weapon.castShadow = true;
+        this.group.add(weapon);
+    }
+    
+    addEnemyIdentifiers() {
+        const theme = this.visualTheme;
+        
+        // Red identification stripe
+        const stripeGeometry = new THREE.BoxGeometry(0.4, 0.05, 0.02);
+        const stripeMaterial = new THREE.MeshStandardMaterial({ 
+            color: theme.accentColor,
+            emissive: 0x220000,
+            metalness: 0.0,
+            roughness: 0.5
+        });
+        const stripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
+        stripe.position.set(0, theme.height * 0.9, 0.32);
+        stripe.castShadow = true;
+        this.group.add(stripe);
+        
+        // Tactical helmet
+        const helmetGeometry = new THREE.SphereGeometry(0.32, 12, 8);
         const helmetMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x2A2A2A,
-            metalness: 0.7 
+            color: theme.clothingColor,
+            metalness: 0.6,
+            roughness: 0.3
         });
         const helmet = new THREE.Mesh(helmetGeometry, helmetMaterial);
-        helmet.position.y = 1.65 * scale;
+        helmet.position.y = theme.height + 0.6;
+        helmet.scale.y = 0.8; // Flatten slightly for helmet look
         helmet.castShadow = true;
         this.group.add(helmet);
         
-        this.group.position.set(this.position.x, this.position.y, this.position.z);
-        this.mesh = this.group;
-    }
-    
-    createPhysicsBody() {
-        try {
-            // Create physics body for collision (cylinder) that matches character scale
-            const characterScale = this.characterDesign ? this.characterDesign.enemyScale || 2.0 : 2.0;
-            const shape = new CANNON.Cylinder(0.5, 0.5, 1.8, 12);
-            
-            this.body = new CANNON.Body({
-                mass: 100, // Heavy enemy
-                material: new CANNON.Material({
-                    friction: 0.3,
-                    restitution: 0.1
-                }),
-                fixedRotation: true // Prevent tumbling
-            });
-            
-            this.body.addShape(shape);
-            // Position to match visual character
-            this.body.position.set(
-                this.position.x, 
-                this.position.y + (0.9 * characterScale), 
-                this.position.z
-            );
-            
-            // Add to physics world
-            this.world.addBody(this.body);
-            
-            console.log(`Enemy physics body created for ${this.name} with scale ${characterScale}`);
-        } catch (error) {
-            console.error(`Error creating enemy physics body for ${this.name}:`, error);
-        }
-    }
-    
-    update(playerPosition, delta) {
-        if (!this.body || !playerPosition) return;
-        
-        // Update mesh position to match physics body with proper scaling
-        if (this.group) {
-            this.group.position.copy(this.body.position);
-            // Adjust for character scale and center offset
-            const characterScale = this.characterDesign ? this.characterDesign.enemyScale || 2.0 : 2.0;
-            this.group.position.y -= (0.9 * characterScale);
-        }
-        
-        // Store previous state for animation changes
-        this.previousState = this.state;
-        
-        // Update suspicion level (decay over time)
-        if (this.suspicionLevel > 0 && !this.playerDetected) {
-            this.suspicionLevel = Math.max(0, this.suspicionLevel - (this.suspicionDecayRate * delta));
-        }
-        
-        // AI behavior and movement
-        this.updateAI(playerPosition, delta);
-        
-        // Update animations based on state
-        this.updateAnimations();
-        
-        // Keep enemy upright
-        this.body.angularVelocity.set(0, 0, 0);
-    }
-    
-    takeDamage(damage) {
-        if (this.isDead) {
-            console.log("Enemy already dead, ignoring damage");
-            return false;
-        }
-        
-        // Convert damage to number and ensure it's exactly what we expect
-        const actualDamage = Number(damage);
-        const oldHealth = this.health;
-        
-        this.health -= actualDamage;
-        
-        console.log(`=== ENEMY DAMAGE TRACKING ===`);
-        console.log(`Damage received: ${actualDamage}`);
-        console.log(`Health before: ${oldHealth}`);
-        console.log(`Health after: ${this.health}`);
-        console.log(`Shots taken: ${Math.ceil((this.maxHealth - this.health) / 40)}`);
-        console.log(`Shots remaining: ${Math.ceil(this.health / 40)}`);
-        console.log(`===========================`);
-        
-        // Trigger hit animation
-        if (this.animationManager) {
-            this.animationManager.playHitAnimation(this);
-        }
-        
-        // Immediately become aggressive when shot
-        if (!this.playerDetected) {
-            this.playerDetected = true;
-            this.state = 'chase';
-            this.suspicionLevel = this.maxSuspicion;
-            console.log("Enemy becomes aggressive after being shot!");
-            this.alertNearbyEnemies();
-        }
-        
-        // Check for death - exactly at 0 or below
-        if (this.health <= 0) {
-            console.log(`=== ENEMY KILLED ===`);
-            console.log(`Total shots taken: ${Math.ceil(this.maxHealth / actualDamage)}`);
-            console.log(`Damage per shot: ${actualDamage}`);
-            console.log(`================`);
-            this.die();
-            return true;
-        }
-        
-        // Become more aggressive when damaged
-        this.detectionRange = Math.min(this.detectionRange + 3, 35);
-        this.speed = Math.min(this.speed + 0.8, 6);
-        
-        // Prefer shooting if has ammo
-        if (this.ammo > 0 && this.state === 'chase') {
-            this.state = 'shoot';
-        }
-        
-        return false;
-    }
-    
-    die() {
-        if (this.isDead) return;
-        
-        console.log(`=== ${this.name} DEATH ===`);
-        this.isDead = true;
-        this.health = 0;
-        
-        // Notify mission manager
-        if (window.game && window.game.missionManager) {
-            window.game.missionManager.enemyEliminated();
-        }
-        
-        // Death animation
-        this.group.rotation.z = Math.PI / 2; // Fall over
-        this.group.position.y -= 0.5;
-        
-        // Change appearance with proper null checks
-        this.group.traverse((child) => {
-            if (child.isMesh && child.material) {
-                try {
-                    if (child.material.color) {
-                        child.material.color.multiplyScalar(0.5); // Darken
-                    }
-                    if (child.material.emissive) {
-                        child.material.emissive.setHex(0x000000);
-                    }
-                } catch (error) {
-                    console.warn("Error applying death visual effect:", error);
-                }
-            }
-        });
-        
-        // Remove physics body immediately to prevent further collisions
-        if (this.body && this.world) {
-            try {
-                this.world.removeBody(this.body);
-                this.body = null;
-            } catch (error) {
-                console.warn("Error removing enemy physics body:", error);
-            }
-        }
-        
-        // Remove from scene after delay
-        setTimeout(() => {
-            if (this.group && this.group.parent) {
-                try {
-                    this.scene.remove(this.group);
-                } catch (error) {
-                    console.warn("Error removing enemy from scene:", error);
-                }
-            }
-        }, 5000);
-        
-        console.log(`${this.name} eliminated`);
-    }
-
-    // CRITICAL: Add the missing getDistanceToPlayer method
-    getDistanceToPlayer(playerPosition) {
-        if (!playerPosition || !this.body) {
-            return Infinity;
-        }
-        
-        return Math.sqrt(
-            Math.pow(playerPosition.x - this.body.position.x, 2) +
-            Math.pow(playerPosition.z - this.body.position.z, 2)
-        );
-    }
-
-    // Add missing methods for cover system integration
-    getPlayerCoverLevel() {
-        // Get player cover level from game's cover system
-        if (window.game && window.game.coverSystem) {
-            return window.game.coverSystem.getCoverLevel();
-        }
-        return 100; // Default to full cover if system not available
-    }
-    
-    calculateCoverDetection(playerCover, distanceToPlayer) {
-        // Calculate detection probability based on cover and distance
-        let detectionChance = 0;
-        
-        if (playerCover < 30) {
-            detectionChance = 0.9; // Very high chance when cover is very low
-        } else if (playerCover < 60) {
-            detectionChance = 0.6; // Moderate chance when cover is low
-        } else if (playerCover < 80) {
-            detectionChance = 0.3; // Low chance when cover is decent
-        } else {
-            detectionChance = 0.1; // Very low chance when cover is good
-        }
-        
-        // Adjust for distance
-        const maxDistance = this.detectionRange;
-        const distanceFactor = 1 - (distanceToPlayer / maxDistance);
-        detectionChance *= Math.max(0, distanceFactor);
-        
-        return detectionChance;
-    }
-    
-    alertNearbyEnemies() {
-        // Alert other enemies when player is detected
-        if (window.game && window.game.npcManager) {
-            window.game.npcManager.enemies.forEach(enemy => {
-                if (enemy !== this && !enemy.isDead) {
-                    const distance = Math.sqrt(
-                        Math.pow(this.body.position.x - enemy.body.position.x, 2) +
-                        Math.pow(this.body.position.z - enemy.body.position.z, 2)
-                    );
-                    
-                    if (distance < 20) { // Alert radius
-                        enemy.playerDetected = true;
-                        enemy.state = 'chase';
-                        enemy.suspicionLevel = enemy.maxSuspicion;
-                        console.log(`${enemy.name} alerted by ${this.name}`);
-                    }
-                }
-            });
-        }
-    }
-    
-    generatePatrolRoute() {
-        // Generate patrol points around the spawn position
-        this.patrolPoints = [];
-        const centerX = this.position.x;
-        const centerZ = this.position.z;
-        const numPoints = 4; // Square patrol pattern
-        
-        for (let i = 0; i < numPoints; i++) {
-            const angle = (Math.PI * 2 * i) / numPoints;
-            const x = centerX + Math.cos(angle) * this.patrolRadius;
-            const z = centerZ + Math.sin(angle) * this.patrolRadius;
-            
-            this.patrolPoints.push({
-                x: x,
-                y: this.position.y,
-                z: z
-            });
-        }
-        
-        console.log(`Patrol route generated for ${this.name}: ${this.patrolPoints.length} points`);
-    }
-    
-    updateAI(playerPosition, delta) {
-        if (!playerPosition) return;
-        
-        const distanceToPlayer = this.getDistanceToPlayer(playerPosition);
-        
-        // Get player cover level from game
-        const playerCover = this.getPlayerCoverLevel();
-        
-        // Determine detection based on cover level and distance
-        const coverDetection = this.calculateCoverDetection(playerCover, distanceToPlayer);
-        
-        // Enhanced detection system
-        const baseDetectionRange = this.detectionRange;
-        let adjustedDetectionRange = baseDetectionRange;
-        
-        // Cover-based detection
-        if (playerCover < this.coverThreshold) {
-            // Cover is blown - much easier to detect
-            adjustedDetectionRange *= 2.0;
-            this.suspicionLevel = Math.min(this.maxSuspicion, this.suspicionLevel + (50 * delta));
-            console.log(`Player cover blown (${playerCover}%) - enemy on high alert!`);
-        } else if (playerCover < 80) {
-            // Suspicion rising
-            adjustedDetectionRange *= 1.3;
-            this.suspicionLevel = Math.min(this.maxSuspicion, this.suspicionLevel + (20 * delta));
-        }
-        
-        // Weapon visibility increases detection
-        const playerHasWeapon = window.game && window.game.player && window.game.player.weapon && window.game.player.weapon.isEquipped;
-        if (playerHasWeapon) {
-            adjustedDetectionRange *= 1.5;
-            this.suspicionLevel = Math.min(this.maxSuspicion, this.suspicionLevel + (30 * delta));
-            console.log("Enemy notices player's weapon - increased suspicion");
-        }
-        
-        // Reset movement flag
-        this.isMoving = false;
-        
-        // State machine with enhanced movement and cover detection
-        switch(this.state) {
-            case 'patrol':
-                this.handlePatrolState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta, playerCover);
-                break;
-                
-            case 'investigate':
-                this.handleInvestigateState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta);
-                break;
-                
-            case 'chase':
-                this.handleChaseState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta);
-                break;
-                
-            case 'shoot':
-                this.handleShootState(playerPosition, distanceToPlayer, delta);
-                break;
-                
-            case 'attack':
-                this.handleAttackState(playerPosition, distanceToPlayer, delta);
-                break;
-        }
-    }
-
-    handleChaseState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta) {
-        if (distanceToPlayer > adjustedDetectionRange * 2.5) {
-            this.state = 'patrol';
-            this.playerDetected = false;
-            this.suspicionLevel = Math.max(0, this.suspicionLevel - 30);
-            console.log("Enemy lost player - returning to patrol");
-        } else if (distanceToPlayer < this.weaponRange && this.ammo > 0) {
-            this.state = 'shoot';
-            console.log(`${this.name} switches to shooting mode`);
-        } else {
-            // Chase player
-            this.moveTowardsTarget(playerPosition, delta, this.speed);
-            this.isMoving = true;
-        }
-    }
-    
-    handleShootState(playerPosition, distanceToPlayer, delta) {
-        if (distanceToPlayer > this.weaponRange || this.ammo <= 0) {
-            this.state = 'chase';
-        } else {
-            // Shoot at player
-            this.shootAtPlayer(playerPosition);
-        }
-    }
-    
-    handleAttackState(playerPosition, distanceToPlayer, delta) {
-        if (distanceToPlayer > this.attackRange) {
-            this.state = 'chase';
-        } else {
-            // Melee attack
-            this.attackPlayer();
-        }
-    }
-
-    shootAtPlayer(playerPosition) {
-        const now = Date.now();
-        if (now - this.lastShotTime < this.shotCooldown || this.ammo <= 0) return;
-        
-        this.lastShotTime = now;
-        this.ammo--;
-        
-        console.log(`${this.name} shoots at player! Ammo remaining: ${this.ammo}`);
-        
-        // Use bullet system to create enemy bullet
-        if (window.game && window.game.bulletSystem) {
-            window.game.bulletSystem.createEnemyBullet(this, playerPosition);
-        }
-    }
-    
-    attackPlayer() {
-        const now = Date.now();
-        if (now - this.lastAttackTime < this.attackCooldown) return;
-        
-        this.lastAttackTime = now;
-        console.log(`${this.name} attacks player with melee!`);
-        
-        if (window.game && window.game.playerTakeDamage) {
-            window.game.playerTakeDamage(this.attackDamage);
-        }
-    }
-    
-    handlePatrolState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta, playerCover) {
-        // Enhanced patrol behavior with cover detection
-        const coverDetection = this.calculateCoverDetection(playerCover, distanceToPlayer);
-        
-        // Check if player detected based on distance and cover
-        if (distanceToPlayer < adjustedDetectionRange) {
-            if (Math.random() < coverDetection) {
-                this.playerDetected = true;
-                this.state = 'investigate';
-                this.suspicionLevel = Math.min(this.maxSuspicion, this.suspicionLevel + 25);
-                console.log(`${this.name} detects suspicious activity (Cover: ${playerCover}%)`);
-            } else if (playerCover < this.coverThreshold) {
-                // Even if not fully detected, become suspicious when cover is blown
-                this.suspicionLevel = Math.min(this.maxSuspicion, this.suspicionLevel + (20 * delta));
-                if (this.suspicionLevel > 50) {
-                    this.state = 'investigate';
-                    console.log(`${this.name} becomes suspicious due to blown cover`);
-                }
-            }
-        }
-        
-        // Continue patrol movement
-        this.updatePatrolMovement(delta);
-        this.isMoving = true;
-    }
-    
-    handleInvestigateState(playerPosition, distanceToPlayer, adjustedDetectionRange, delta) {
-        // Investigation behavior
-        if (distanceToPlayer < adjustedDetectionRange * 0.7) {
-            // Player is close during investigation - become aggressive
-            this.playerDetected = true;
-            this.state = 'chase';
-            this.suspicionLevel = this.maxSuspicion;
-            console.log(`${this.name} confirms threat - engaging!`);
-            this.alertNearbyEnemies();
-        } else if (this.suspicionLevel < 20) {
-            // Suspicion has decreased, return to patrol
-            this.state = 'patrol';
-            console.log(`${this.name} returns to patrol`);
-        } else {
-            // Move towards last known player position
-            this.moveTowardsTarget(playerPosition, delta, this.patrolSpeed * 1.5);
-            this.isMoving = true;
-            
-            // Decrease suspicion slowly during investigation
-            this.suspicionLevel = Math.max(0, this.suspicionLevel - (10 * delta));
-        }
-    }
-    
-    updatePatrolMovement(delta) {
-        // Enhanced patrol movement with proper pathfinding
-        if (!this.patrolPoints || this.patrolPoints.length === 0) {
-            this.generatePatrolRoute();
-            return;
-        }
-        
-        const currentTarget = this.patrolPoints[this.currentPatrolIndex];
-        if (!currentTarget) return;
-        
-        const currentPos = this.body.position;
-        const distance = Math.sqrt(
-            Math.pow(currentTarget.x - currentPos.x, 2) +
-            Math.pow(currentTarget.z - currentPos.z, 2)
-        );
-        
-        if (distance < 2) {
-            // Reached patrol point, move to next one
-            this.currentPatrolIndex = (this.currentPatrolIndex + 1) % this.patrolPoints.length;
-            console.log(`${this.name} reached patrol point ${this.currentPatrolIndex}`);
-        } else {
-            // Move towards current patrol point
-            this.moveTowardsTarget(currentTarget, delta, this.patrolSpeed);
-        }
-    }
-    
-    moveTowardsTarget(target, delta, speed) {
-        if (!target || !this.body) return;
-        
-        const currentPos = this.body.position;
-        const direction = {
-            x: target.x - currentPos.x,
-            z: target.z - currentPos.z
-        };
-        
-        const distance = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
-        
-        if (distance > 0.1) {
-            // Normalize direction
-            direction.x /= distance;
-            direction.z /= distance;
-            
-            // Apply movement
-            this.body.velocity.x = direction.x * speed;
-            this.body.velocity.z = direction.z * speed;
-            
-            // Face movement direction
-            const angle = Math.atan2(direction.x, direction.z);
-            this.group.rotation.y = angle;
-        } else {
-            // Stop movement when close to target
-            this.body.velocity.x = 0;
-            this.body.velocity.z = 0;
-        }
-    }
-    
-    updateAnimations() {
-        // Update animation state based on current behavior
-        if (this.animationManager) {
-            let animationState = 'idle';
-            
-            if (this.isMoving) {
-                animationState = 'walking';
-            }
-            
-            // Only change animation if state actually changed
-            if (this.previousState !== this.state || this.isMoving !== this.wasMoving) {
-                this.animationManager.setAnimationState(this, animationState);
-            }
-            
-            this.wasMoving = this.isMoving;
-        }
+        console.log(`Added enemy identifiers for ${this.name}`);
     }
 }
 

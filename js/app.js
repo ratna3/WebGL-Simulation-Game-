@@ -371,8 +371,9 @@ class Game {
         let facesLoaded = 0;
         let missingHeads = [];
         let incorrectlyPositionedHeads = [];
+        let visualThemeSuccess = 0;
         
-        // Check NPCs
+        // Enhanced verification for NPCs with visual themes
         this.npcManager.npcs.forEach((npc, index) => {
             npcCount++;
             if (npc.group) {
@@ -380,6 +381,7 @@ class Game {
                 let headPosition = null;
                 let chestPosition = null;
                 let hasFacialFeatures = false;
+                let hasThemeFeatures = false;
                 
                 npc.group.traverse(child => {
                     if (child instanceof THREE.Mesh) {
@@ -397,34 +399,40 @@ class Game {
                             child.geometry.parameters && child.geometry.parameters.radius < 0.1) {
                             hasFacialFeatures = true;
                         }
+                        // Check for theme-specific features
+                        if (child.material && (
+                            child.material.color.getHex() === npc.visualTheme?.accentColor ||
+                            child.material.emissive?.r > 0
+                        )) {
+                            hasThemeFeatures = true;
+                        }
                     }
                 });
                 
                 if (hasHead) {
                     facesLoaded++;
+                    if (hasThemeFeatures) visualThemeSuccess++;
+                    
                     // Verify head is properly positioned above chest
                     if (chestPosition && headPosition && (headPosition - chestPosition) < 0.5) {
-                        incorrectlyPositionedHeads.push(`NPC ${index}: ${npc.name || 'Unnamed'} - Head too close to chest (${headPosition} vs ${chestPosition})`);
-                        console.warn(`Head positioning issue for ${npc.name}: head at ${headPosition}, chest at ${chestPosition}`);
+                        incorrectlyPositionedHeads.push(`NPC ${index}: ${npc.name || 'Unnamed'} - Head too close to chest`);
                         this.fixHeadPositioning(npc, headPosition, chestPosition);
                     }
                 } else {
                     missingHeads.push(`NPC ${index}: ${npc.name || 'Unnamed'} (${npc.type})`);
-                    console.warn(`Missing head detected for NPC ${npc.name}:`, npc.group);
-                    
-                    // Attempt to fix missing head
                     this.fixMissingHead(npc);
                 }
             }
         });
         
-        // Check enemies with same verification
+        // Enhanced verification for enemies
         this.npcManager.enemies.forEach((enemy, index) => {
             npcCount++;
             if (enemy.group) {
                 let hasHead = false;
                 let headPosition = null;
                 let chestPosition = null;
+                let hasEnemyFeatures = false;
                 
                 enemy.group.traverse(child => {
                     if (child instanceof THREE.Mesh) {
@@ -435,42 +443,62 @@ class Game {
                         if (child.geometry instanceof THREE.CylinderGeometry && child.position.y > 1.0 && child.position.y < 2.0) {
                             chestPosition = child.position.y;
                         }
+                        // Check for enemy-specific features (red eyes, tactical gear)
+                        if (child.material && (
+                            child.material.color.getHex() === 0xFF0000 ||
+                            child.material.emissive?.r > 0 ||
+                            child.material.metalness > 0.5
+                        )) {
+                            hasEnemyFeatures = true;
+                        }
                     }
                 });
                 
                 if (hasHead) {
                     facesLoaded++;
+                    if (hasEnemyFeatures) visualThemeSuccess++;
+                    
                     if (chestPosition && headPosition && (headPosition - chestPosition) < 0.5) {
-                        incorrectlyPositionedHeads.push(`Enemy ${index}: ${enemy.name || 'Unnamed'} - Head too close to chest`);
+                        incorrectlyPositionedHeads.push(`Enemy ${index}: ${enemy.name || 'Unnamed'} - Head positioning issue`);
                         this.fixHeadPositioning(enemy, headPosition, chestPosition);
                     }
                 } else {
                     missingHeads.push(`Enemy ${index}: ${enemy.name || 'Unnamed'}`);
-                    console.warn(`Missing head detected for enemy ${enemy.name}:`, enemy.group);
-                    
-                    // Attempt to fix missing head
                     this.fixMissingHead(enemy);
                 }
             }
         });
         
-        console.log(`Character verification: ${facesLoaded}/${npcCount} characters have heads loaded`);
+        console.log(`Enhanced Character Verification Results:`);
+        console.log(`- ${facesLoaded}/${npcCount} characters have heads loaded`);
+        console.log(`- ${visualThemeSuccess}/${npcCount} characters have visual theme features`);
+        console.log(`- Character distinction success rate: ${Math.round(visualThemeSuccess/npcCount*100)}%`);
         
         if (missingHeads.length > 0) {
             console.warn(`Characters missing heads:`, missingHeads);
         }
         
         if (incorrectlyPositionedHeads.length > 0) {
-            console.warn(`Characters with head positioning issues:`, incorrectlyPositionedHeads);
+            console.warn(`Characters with positioning issues (fixed):`, incorrectlyPositionedHeads);
         }
+        
+        // Verify character type distinction
+        const civilians = this.npcManager.npcs.filter(npc => npc.type === 'civilian');
+        const criminals = this.npcManager.npcs.filter(npc => npc.type === 'criminal');
+        const police = this.npcManager.npcs.filter(npc => npc.type === 'police');
+        const enemies = this.npcManager.enemies;
+        
+        console.log(`Character Distribution:`);
+        console.log(`- Civilians: ${civilians.length} (should be easily identifiable)`);
+        console.log(`- Criminals: ${criminals.length} (should look suspicious)`);
+        console.log(`- Police: ${police.length} (should look official)`);
+        console.log(`- Enemies: ${enemies.length} (should look dangerous)`);
         
         if (facesLoaded === 0 && npcCount > 0) {
             console.error("CRITICAL: No character heads detected - character system failure");
         } else {
-            console.log(`Character system verification complete: ${Math.round(facesLoaded/npcCount*100)}% success rate`);
-            if (incorrectlyPositionedHeads.length > 0) {
-                console.log(`Fixed ${incorrectlyPositionedHeads.length} head positioning issues`);
-            }
+            console.log(`✓ Enhanced character system verification complete`);
+            console.log(`✓ Visual distinction system: ${Math.round(visualThemeSuccess/npcCount*100)}% success rate`);
         }
     }
     

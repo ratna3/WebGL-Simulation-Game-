@@ -346,6 +346,53 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
+        
+        /* Mission Briefing Styles */
+        #mission-briefing {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #mission-briefing h1 {
+            color: #ff3e3e;
+            margin-bottom: 30px;
+        }
+        
+        #mission-briefing h2 {
+            margin-bottom: 20px;
+        }
+        
+        #mission-briefing ul {
+            text-align: left;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        
+        #mission-briefing button {
+            background: #ff3e3e;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        #mission-briefing button:hover {
+            background-color: #ff5555;
+        }
     </style>
 </head>
 <body>
@@ -788,11 +835,101 @@
             // Don't start loading scripts automatically - wait for agent name confirmation
             debugLog("Waiting for agent name confirmation...");
         });
-    </script>
-    
-    <!-- Replace the debug button with a better version -->
-    <script>
-        // Add improved debug controls
+        
+        // Mission briefing function
+        function showMissionBriefing() {
+            // Get agent name from the naming screen
+            const agentName = window.getAgentName ? window.getAgentName() : "Agent Smith";
+            
+            // Create mission briefing overlay
+            const briefing = document.createElement('div');
+            briefing.id = 'mission-briefing';
+            briefing.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.9);
+                color: white;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                z-index: 200;
+                font-family: 'Courier New', monospace;
+            `;
+            
+            briefing.innerHTML = `
+                <div style="max-width: 700px; text-align: center; padding: 20px;">
+                    <h1 style="color: #ff3e3e; margin-bottom: 30px;">MISSION BRIEFING</h1>
+                    <h2 style="margin-bottom: 20px;">Operation: Undercover Agent</h2>
+                    
+                    <div style="text-align: left; margin-bottom: 30px; line-height: 1.6;">
+                        <p><strong>${agentName},</strong></p>
+                        <p>You are tasked with infiltrating a criminal organization. Use dialogue to gather intel, but be prepared to defend yourself.</p>
+                        
+                        <p><strong>Objectives:</strong></p>
+                        <ul>
+                            <li>Gather intelligence from criminal contacts</li>
+                            <li>Maintain your cover identity as ${agentName}</li>
+                            <li>Eliminate hostile targets when discovered</li>
+                            <li>Avoid civilian casualties</li>
+                            <li>Progress through multiple levels of increasing difficulty</li>
+                        </ul>
+                        
+                        <p><strong>Character Identification Guide:</strong></p>
+                        <ul>
+                            <li><span style="color: #4A90E2;">👤 Civilians</span> - Blue clothing, friendly hats, gold accents - <strong>DO NOT HARM</strong></li>
+                            <li><span style="color: #ff4444;">🕶️ Criminals</span> - Dark clothing, sunglasses, weapon holsters - <strong>GATHER INTEL</strong></li>
+                            <li><span style="color: #4444ff;">👮 Police</span> - Blue uniforms, badges, official hats - <strong>MAINTAIN COVER</strong></li>
+                            <li><span style="color: #ff0000;">⚔️ Enemies</span> - Black tactical gear, red eyes, larger build - <strong>ELIMINATE ON SIGHT</strong></li>
+                        </ul>
+                        
+                        <p><strong>Visual Recognition Tips:</strong></p>
+                        <ul>
+                            <li>Civilians: Friendly appearance with bright colors and hats</li>
+                            <li>Criminals: Dark, suspicious appearance with sunglasses</li>
+                            <li>Police: Official uniforms with visible badges</li>
+                            <li>Enemies: Military-style gear with red glowing eyes</li>
+                        </ul>
+                        
+                        <p><strong>Controls:</strong></p>
+                        <ul>
+                            <li>WASD - Move around</li>
+                            <li>Mouse - Look around</li>
+                            <li>E - Interact with people</li>
+                            <li>Tab - Equip/Holster weapon</li>
+                            <li>Left Click - Shoot (when weapon equipped)</li>
+                            <li>R - Reload weapon</li>
+                        </ul>
+                        
+                        <p><strong>Level System:</strong></p>
+                        <ul>
+                            <li>Level 1: 3 enemies (Easy start)</li>
+                            <li>Level 2: 5 enemies</li>
+                            <li>Level 3+: Gradually increasing difficulty</li>
+                            <li>Complete all levels to win the game</li>
+                        </ul>
+                        
+                        <p><strong>WARNING:</strong> Using your weapon will blow your cover. Use it only when necessary!</p>
+                    </div>
+                    
+                    <button onclick="this.parentElement.parentElement.remove()" 
+                            style="background: #ff3e3e; color: white; border: none; padding: 15px 30px; 
+                                   font-size: 18px; border-radius: 5px; cursor: pointer;">
+                        BEGIN MISSION
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(briefing);
+            
+            console.log(`Enhanced Mission Controls: Character identification system active`);
+            console.log(`Visual Guide: Civilians=Blue/Gold, Criminals=Dark/Sunglasses, Police=Blue/Badges, Enemies=Black/Red`);
+        }
+        
+        // Replace the debug button with a better version
         window.addEventListener('DOMContentLoaded', () => {
             const debugPanel = document.createElement('div');
             debugPanel.style.cssText = `

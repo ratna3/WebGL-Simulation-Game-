@@ -515,6 +515,16 @@ class DialogueSystem {
             prompt.style.display = 'none';
         }
     }
+    
+    getGenericDialogue() {
+        return {
+            text: "Hello there. I don't have much to say right now.",
+            options: [
+                { text: "Thanks anyway.", action: 'end', suspicion: 0 },
+                { text: "Have a good day.", action: 'end', suspicion: 0 }
+            ]
+        };
+    }
 }
 
 // Make DialogueSystem globally available
