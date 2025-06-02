@@ -1,114 +1,235 @@
-# WebGL-Simulation-Game-
+# REPO City - Undercover Agent Game
 
-## 10 Game Concepts: NPC-to-Enemy Transformation FPS
+**Developer:** Ratna Kirti  
+**GitHub:** [@ratna3](https://github.com/ratna3)  
+**Game Type:** 3D First-Person Action/Stealth Game  
+**Engine:** Three.js + Cannon.js Physics  
 
-### 1. **"Undercover Agent"**
-- **Setting**: Modern city
-- **Role**: You're a secret agent infiltrating a criminal organization
-- **Mechanic**: NPCs are criminals, cops, and civilians. Wrong dialogue choices blow your cover
-- **Transformation**: Suspicious responses turn allies into enemies who call for backup
-- **Objective**: Complete missions without exposing your identity
+## 🎮 Game Overview
 
-### 2. **"Zombie Outbreak Investigation"**
-- **Setting**: Small town during early zombie outbreak
-- **Role**: CDC investigator trying to find patient zero
-- **Mechanic**: NPCs are infected, immune, or carriers. Wrong questions spread panic
-- **Transformation**: Panicked NPCs either flee (losing intel) or attack in fear
-- **Objective**: Gather information while preventing mass hysteria
+REPO City is an immersive 3D undercover agent game where you infiltrate a criminal organization in a procedurally generated urban environment. As an undercover agent, you must gather intelligence through dialogue, maintain your cover, and eliminate threats when necessary.
 
-### 3. **"Alien Invasion: Trust No One"**
-- **Setting**: Space station or colony
-- **Role**: Security officer during alien infiltration
-- **Mechanic**: Some NPCs are alien shapeshifters. Wrong accusations reveal your suspicions
-- **Transformation**: Accused innocents become hostile; real aliens attack when discovered
-- **Objective**: Identify and eliminate alien threats without killing innocents
+### Core Gameplay Features
 
-### 4. **"Corporate Espionage"**
-- **Setting**: High-tech corporate facility
-- **Role**: Industrial spy stealing trade secrets
-- **Mechanic**: NPCs are employees, security, executives. Wrong social engineering fails
-- **Transformation**: Failed manipulation attempts trigger security alerts and hostile guards
-- **Objective**: Access restricted areas and steal data without raising alarms
+- **Undercover Mechanics**: Maintain cover by avoiding suspicious behavior
+- **Dynamic Dialogue System**: Interact with NPCs to gather intelligence
+- **Advanced Combat**: First-person shooting with realistic weapon mechanics
+- **Character Recognition**: Detailed facial features and character design
+- **Progressive Difficulty**: Multi-level system with increasing enemy count
+- **Physics-Based Interactions**: Realistic movement and collision detection
 
-### 5. **"Wild West Vigilante"**
-- **Setting**: Frontier town in the Old West
-- **Role**: Bounty hunter or sheriff investigating corruption
-- **Mechanic**: NPCs are townsfolk, outlaws, corrupt officials. Wrong accusations anger locals
-- **Transformation**: False accusations turn the town against you in shootouts
-- **Objective**: Root out corruption while maintaining public support
+## 🏗️ Technical Architecture
 
-### 6. **"Cyberpunk Hacker"**
-- **Setting**: Dystopian cyber city
-- **Role**: Netrunner investigating corporate conspiracy
-- **Mechanic**: NPCs are corp employees, street contacts, rival hackers. Wrong data requests alert security
-- **Transformation**: Failed hacking attempts trigger ICE programs and security teams
-- **Objective**: Uncover conspiracy while avoiding corporate retaliation
+### Graphics Engine (Three.js)
+- **Scene Management**: Advanced 3D scene with dynamic lighting
+- **Character Design**: Detailed humanoid models with facial features, limbs, and accessories
+- **Procedural City**: Grid-based urban environment with buildings and roads
+- **Visual Effects**: Muzzle flashes, particle systems, and screen effects
+- **Shadow Mapping**: Real-time shadows with PCF soft shadow mapping
 
-### 7. **"Medieval Inquisitor"**
-- **Setting**: Medieval village suspected of harboring heretics
-- **Role**: Church inquisitor investigating heresy
-- **Mechanic**: NPCs are villagers, clergy, suspected heretics. Wrong accusations create enemies
-- **Transformation**: False accusations turn villagers violent; real heretics summon supernatural enemies
-- **Objective**: Find true heretics without condemning innocents
+### Physics Engine (Cannon.js)
+- **Rigid Body Dynamics**: Physics bodies for all interactive objects
+- **Collision Detection**: 
+  - Player vs Environment collision
+  - Bullet vs Character collision with body part detection (head, chest, arms, legs)
+  - Multi-body character collision systems
+- **Material Properties**: Friction and restitution for realistic interactions
+- **Gravity Simulation**: Realistic falling and jumping mechanics
 
-### 8. **"Post-Apocalyptic Diplomat"**
-- **Setting**: Wasteland settlements after nuclear war
-- **Role**: Vault dweller trying to establish trade agreements
-- **Mechanic**: NPCs are raiders, traders, settlers. Wrong negotiations break alliances
-- **Transformation**: Failed diplomacy turns potential allies into raider attacks
-- **Objective**: Build peaceful trade networks in a hostile world
+### Advanced Systems
 
-### 9. **"School Shooter Prevention"** (Sensitive topic - educational focus)
-- **Setting**: High school with tension building
-- **Role**: Guidance counselor or security trying to prevent violence
-- **Mechanic**: NPCs are students, teachers, potential threats. Wrong approach escalates situations
-- **Transformation**: Poor counseling or accusations turn troubled students hostile
-- **Objective**: De-escalate tensions and get help for at-risk individuals
+#### Weapon System (`js/weapons.js`)
+- **Realistic Ballistics**: Bullet trajectory with physics simulation
+- **Recoil Animation**: Advanced recoil system with multiple phases
+- **Crosshair Alignment**: Weapons align with crosshair for accurate shooting
+- **Damage System**: Body-part specific damage (40 damage base, 2x headshot multiplier)
+- **Ammo Management**: Reload mechanics with visual feedback
 
-### 10. **"Time Police Detective"**
-- **Setting**: Various time periods (time travel setting)
-- **Role**: Temporal agent investigating timeline disruptions
-- **Mechanic**: NPCs are historical figures, time criminals, innocent people. Wrong historical knowledge changes timeline
-- **Transformation**: Timeline changes turn historical allies into enemies or create paradoxes
-- **Objective**: Fix temporal anomalies without creating bigger paradoxes
+#### Character Design (`js/design/characterDesign.js`)
+- **Detailed Modeling**: Complete humanoid characters with:
+  - Facial features (eyes, nose, mouth, ears, eyebrows)
+  - Body parts (torso, arms, hands with fingers, legs, feet)
+  - Character-specific accessories (police badges, criminal markings)
+- **Proportional Scaling**: Consistent character heights and proportions
+- **Animation System**: Walking, idle, and combat animations
 
-## Core Gameplay Mechanics for All Concepts:
+#### AI & NPC System (`js/npc.js`)
+- **Behavioral AI**: NPCs with walking patterns and interaction states
+- **Dialogue Personalities**: Dynamic personality system affecting conversations
+- **Enemy AI**: Hostile detection and combat behavior
+- **Health Systems**: Individual health tracking with visual health bars
 
-### Dialogue System
-- **Multiple Choice Responses**: 3-4 options per conversation
-- **Reputation System**: Track relationships with different factions
-- **Knowledge Requirements**: Some correct responses need gathered intel
-- **Stress Indicators**: Visual cues showing NPC emotional state
+#### Mission System (`js/game/missionManager.js`)
+- **Progressive Levels**: Increasing difficulty with more enemies per level
+- **Objective Tracking**: Mission goals and completion detection
+- **Cover System**: Stealth mechanics with cover level tracking
 
-### NPC Transformation System
-- **Gradual Hostility**: NPCs don't immediately attack - they get suspicious first
-- **Group Dynamics**: One hostile NPC can influence others nearby
-- **Redemption Paths**: Some hostile NPCs can be calmed down with correct follow-up
-- **Escalation Levels**: Suspicious → Hostile → Aggressive → Combat
+#### City Generation (`js/city/cityGenerator.js`)
+- **Procedural Buildings**: Realistic urban structures with varied heights
+- **Grid-Based Layout**: Organized city blocks with roads and intersections
+- **Strategic Positioning**: Enemies spawn in building gaps for tactical gameplay
 
-### Mission Structure
-- **Investigation Phase**: Gather information through dialogue
-- **Social Navigation**: Choose conversation partners carefully
-- **Combat as Failure**: Fighting means you've failed the social challenge
-- **Multiple Solutions**: Different dialogue paths lead to different outcomes
+## 🎯 Game Mechanics
 
-### Weapon/Tool Integration
-- **Non-lethal Options**: Stun weapons, tranquilizers for de-escalation
-- **Evidence Gathering**: Camera, recording devices, scanner tools
-- **Social Tools**: Fake IDs, bribes, official badges
-- **Emergency Weapons**: For when diplomacy completely fails
+### Combat System
+- **Weapon Handling**: Tab to equip/holster, left-click to shoot, R to reload
+- **Damage Model**: 4-shot elimination system (100 HP, 25 damage per hit)
+- **Body Part Targeting**: Headshots deal double damage
+- **Bullet Physics**: Realistic projectile simulation with collision detection
 
-## Recommended Starting Concept: "Undercover Agent"
-**Why this works best for your current setup:**
-- Modern setting fits existing assets
-- Clear good/bad guy distinctions
-- Familiar FPS mechanics
-- Easy to understand consequences
-- Room for expansion with different mission types
+### Stealth System
+- **Cover Mechanics**: Actions affect your cover level (weapon visibility, movement speed)
+- **Dialogue Intelligence**: Gather information without blowing cover
+- **Dynamic Responses**: NPCs react based on your behavior and previous interactions
 
-## Implementation Priority:
-1. Basic dialogue system with NPC mood tracking
-2. Simple reputation system
-3. NPC transformation triggers
-4. Mission objectives and failure states
-5. Weapon restrictions (non-lethal first)
+### Character Interaction
+- **Rich Dialogue**: Multiple conversation options based on NPC personality
+- **Intelligence Gathering**: Extract information from criminals and contacts
+- **Civilian Protection**: Avoid harming innocent bystanders
+
+## 🚀 Setup and Installation
+
+### Prerequisites
+- Modern web browser with WebGL support
+- Live Server extension for VS Code (or any local web server)
+- No additional dependencies - all libraries loaded via CDN
+
+### Running the Game
+
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/ratna3/WebGL-Simulation-Game-.git
+   cd WebGL-Simulation-Game-
+   ```
+
+2. **Install Live Server (VS Code)**
+   - Open VS Code
+   - Go to Extensions (Ctrl+Shift+X)
+   - Search for "Live Server" by Ritwick Dey
+   - Install the extension
+
+3. **Launch the Game**
+   - Open the project folder in VS Code
+   - Right-click on `index.html`
+   - Select "Open with Live Server"
+   - Game will open in your default browser
+
+4. **Alternative Methods**
+   - **Python**: `python -m http.server 8000` (Python 3) or `python -m SimpleHTTPServer 8000` (Python 2)
+   - **Node.js**: `npx http-server` or `npx live-server`
+   - **PHP**: `php -S localhost:8000`
+
+### Browser Compatibility
+- Chrome/Chromium (Recommended)
+- Firefox
+- Safari
+- Edge
+
+## 🎮 Game Controls
+
+| Action | Control |
+|--------|---------|
+| Move | W/A/S/D |
+| Look Around | Mouse |
+| Jump | Space |
+| Sprint | Shift |
+| Interact | E |
+| Equip/Holster Weapon | Tab |
+| Shoot | Left Click |
+| Reload | R |
+| Enable Mouse Look | Click in game area |
+| Release Mouse | Escape |
+
+## 📁 Project Structure
+
+```
+WebGL-Simulation-Game-/
+├── index.html                          # Main game entry point
+├── css/style.css                       # Game styling
+├── js/
+│   ├── app.js                         # Main game class and initialization
+│   ├── player.js                      # Player controller and mechanics
+│   ├── weapons.js                     # Advanced weapon system
+│   ├── npc.js                         # NPC AI and behavior
+│   ├── dialogue.js                    # Dialogue system
+│   ├── environment.js                 # Environment management
+│   ├── utils.js                       # Utility functions and physics helpers
+│   ├── buildings/
+│   │   ├── buildingSystem.js          # Building generation
+│   │   └── buildingTextures.js        # Texture management
+│   ├── city/
+│   │   └── cityGenerator.js           # Procedural city generation
+│   ├── design/
+│   │   └── characterDesign.js         # Character modeling system
+│   ├── effects/
+│   │   ├── bulletSystem.js            # Bullet physics and rendering
+│   │   └── animationManager.js        # Animation systems
+│   └── game/
+│       └── missionManager.js          # Mission and level management
+└── README.md                          # This file
+```
+
+## 🔧 Development Features
+
+### Debug Tools
+- **Console Logging**: Comprehensive debug output
+- **Debug Panel**: Press Ctrl+D to access debug controls
+- **Real-time Monitoring**: Character positions, health, and game state
+- **Performance Tracking**: Physics and rendering performance metrics
+
+### Modular Architecture
+- **Component System**: Separated systems for easy modification
+- **Event-Driven**: Loosely coupled systems communicating via events
+- **Configurable**: Easy to adjust game parameters and mechanics
+
+## 🎯 Game Flow
+
+1. **Agent Identity**: Enter your agent codename
+2. **Mission Briefing**: Receive objectives and controls information
+3. **City Infiltration**: Navigate the procedural city environment
+4. **Intelligence Gathering**: Interact with NPCs to gather information
+5. **Combat Engagement**: Eliminate threats when cover is blown
+6. **Level Progression**: Complete levels with increasing difficulty
+7. **Mission Success**: Complete all levels to win
+
+## 🔍 Technical Highlights
+
+### Advanced Physics Integration
+- **Character Collision**: Multi-body collision system for realistic character physics
+- **Bullet Ballistics**: Physics-simulated projectiles with accurate collision detection
+- **Environmental Interaction**: Realistic movement and collision with city structures
+
+### Sophisticated AI Systems
+- **Personality-Driven Dialogue**: NPCs with unique personalities affecting conversation
+- **Dynamic Behavioral States**: Walking patterns, combat stances, and interaction modes
+- **Intelligence Simulation**: Information gathering through strategic conversations
+
+### Performance Optimizations
+- **Efficient Rendering**: Optimized Three.js rendering pipeline
+- **Physics Optimization**: Selective physics simulation for performance
+- **Memory Management**: Proper cleanup and resource management
+
+## 🐛 Troubleshooting
+
+### Common Issues
+1. **Game won't load**: Ensure you're running from a web server, not file:// protocol
+2. **Mouse look not working**: Click in the game area to enable pointer lock
+3. **Performance issues**: Try Chrome browser for best WebGL performance
+4. **Physics glitches**: Refresh the page to reset physics world
+
+### Performance Tips
+- Use Chrome or Chromium-based browsers for best performance
+- Ensure hardware acceleration is enabled
+- Close other tabs to free up GPU resources
+
+## 📜 License
+
+This project is developed by Ratna Kirti for educational and portfolio purposes.
+
+## 🤝 Contributing
+
+This is a personal project, but feedback and suggestions are welcome! Feel free to open issues or reach out.
+
+---
+
+**Enjoy your undercover mission in REPO City! 🕵️‍♂️**
